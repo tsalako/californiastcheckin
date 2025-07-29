@@ -1,0 +1,159 @@
+<!--
+
+Copyright 2022 Google Inc. All rights reserved.
+
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use this file except in compliance with the License. You may obtain a copy of
+the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+License for the specific language governing permissions and limitations under
+the License.
+
+-->
+<html>
+<title>California St. Dreaming</title>
+<head>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<link rel="stylesheet" href="//fonts.googleapis.com/css?family=Roboto:100,300,400,500,700%7CGoogle+Sans:400,500%7CGoogle+Sans+Text:400,700%7CProduct+Sans:400" />
+<link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+  <div class="theme-toggle">
+    <label class="switch">
+      <input type="checkbox" id="themeSwitch">
+      <span class="slider round"></span>
+    </label>
+  </div>
+
+  <div id="content" class="container">
+    <h2 class="form-title">Create Your Wallet Pass</h2>
+
+    <!-- Sign In -->
+    <div id="signinWrapper" class="signin-wrapper">
+      <div id="g_id_onload"
+           data-client_id="65103160055-ugejq1km2u3koba5977k35qjcgsc4nbi.apps.googleusercontent.com"
+           data-callback="onSignIn"
+           data-auto_prompt="false">
+      </div>
+      <div class="g_id_signin"
+           data-type="standard"
+           data-size="large"
+           data-theme="outline"
+           data-text="sign_in_with"
+           data-shape="rectangular"
+           data-logo_alignment="left">
+      </div>
+    </div>
+
+    <!-- Show signed in name -->
+    <p id="signedInAs" class="signed-in-as" style="display:none;"></p>
+
+    <!-- Create Pass -->
+    <form id="createPass" class="form">
+      <input type="submit" value="Create pass" id="createPassSubmit" class="button">
+      <div id="button" class="wallet-button-wrapper"></div>
+    </form>
+
+    <!-- Record Visit -->
+    <form id="recordVisit">
+      <input type="submit" value="Record Visit" id="recordVisitSubmit">
+    </form>
+  </div>
+
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script>
+    let userEmail = '', idToken = '', fullName = '';
+
+    function onSignIn(response) {
+      idToken = response.credential;
+      const payload = JSON.parse(atob(idToken.split('.')[1]));
+
+      userEmail = payload.email;
+      fullName = payload.name;
+
+      localStorage.setItem('userEmail', userEmail);
+      localStorage.setItem('idToken', idToken);
+      localStorage.setItem('name', fullName);
+
+      // Hide sign-in button
+      document.getElementById('signinWrapper').style.display = 'none';
+
+      // Show "Signed in as..."
+      const signedInEl = document.getElementById('signedInAs');
+      signedInEl.textContent = `${fullName}`;
+      signedInEl.style.display = 'block';
+
+      // Show "Create Pass" button
+      document.getElementById('createPassSubmit').style.display = 'block';
+    }
+
+    document.getElementById('createPass').addEventListener('submit', e => {
+      e.preventDefault();
+
+      const email = localStorage.getItem('userEmail');
+      const name = localStorage.getItem('name');
+      const token = localStorage.getItem('idToken');
+
+      if (!email || !token || !name) {
+        alert('Please sign in with Google first.');
+        return;
+      }
+
+      const container = document.getElementById('button');
+      container.classList.remove('animate');
+
+      fetch(`/`, {
+        method: 'POST',
+        body: `name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&idToken=${encodeURIComponent(token)}`,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      }).then(res => res.text())
+        .then(button => {
+          const container = document.getElementById('button');
+          container.innerHTML = button;
+          container.classList.add('animate');
+        });
+    });
+
+    document.getElementById('recordVisit').addEventListener('submit', e => {
+      e.preventDefault();
+      const email = localStorage.getItem('userEmail');
+
+      if (!email) {
+        alert('Please sign in with Google first.');
+        return;
+      }
+
+      fetch(`/recordVisit`, {
+        method: 'POST', 
+        body: `email=${encodeURIComponent(email)}`,
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'}
+      });
+    });
+
+    // Theme toggle
+    const toggle = document.getElementById('themeSwitch');
+    const body = document.body;
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') {
+      body.classList.add('dark');
+      toggle.checked = true;
+    }
+    toggle.addEventListener('change', () => {
+      if (toggle.checked) {
+        body.classList.add('dark');
+        localStorage.setItem('theme', 'dark');
+      } else {
+        body.classList.remove('dark');
+        localStorage.setItem('theme', 'light');
+      }
+    });
+  </script>
+</body>
+</html>
