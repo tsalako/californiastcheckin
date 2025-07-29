@@ -30,7 +30,7 @@ const classId = `${issuerId}.${classSuffix}${postpend}`;
 
 const baseUrl = 'https://walletobjects.googleapis.com/walletobjects/v1';
 
-const credentials = require(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
 
 const walletClient = new GoogleAuth({
   credentials: credentials,
