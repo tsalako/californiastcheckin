@@ -1,4 +1,4 @@
-/* Root defaults */
+/* Root Theme Variables */
 :root {
   --bg-color: #f5f7fa;
   --text-color: #1e1e1e;
@@ -11,7 +11,6 @@
   --response-color: #333;
 }
 
-/* Dark theme overrides */
 body.dark {
   --bg-color: #121212;
   --text-color: #e0e0e0;
@@ -24,27 +23,33 @@ body.dark {
   --response-color: #a0a0a0;
 }
 
+/* Global Layout */
 body {
+  font-family: 'Google Sans', 'Roboto', sans-serif;
   background-color: var(--bg-color);
   color: var(--text-color);
-  font-family: 'Google Sans', 'Roboto', sans-serif;
   margin: 0;
   padding: 0;
   display: flex;
-  height: 100vh;
+  min-height: 100vh;
   justify-content: center;
   align-items: center;
+  box-sizing: border-box;
 }
 
+/* Main Container */
 .container {
   background-color: var(--card-bg);
-  padding: 2rem 3rem;
+  padding: 2rem 1.5rem;
   border-radius: 12px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   width: 100%;
-  max-width: 400px;
+  max-width: 480px;
+  margin: 2rem;
+  box-sizing: border-box;
 }
 
+/* Form Structure */
 .form {
   display: flex;
   flex-direction: column;
@@ -58,6 +63,25 @@ body {
   margin-bottom: 1.5rem;
 }
 
+.form-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.hidden {
+  opacity: 0;
+  pointer-events: none;
+  height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  transition: opacity 0.3s ease;
+}
+
+/* Inputs */
 .input {
   padding: 0.75rem 1rem;
   font-size: 1rem;
@@ -67,6 +91,7 @@ body {
   color: var(--text-color);
   outline: none;
   transition: border-color 0.3s ease, background-color 0.3s ease;
+  width: 100%;
 }
 
 .input::placeholder {
@@ -75,8 +100,10 @@ body {
 
 .input:focus {
   border-color: var(--button-bg);
+  background-color: var(--input-bg);
 }
 
+/* Buttons */
 .button {
   padding: 0.75rem 1rem;
   background-color: var(--button-bg);
@@ -87,18 +114,40 @@ body {
   border-radius: 8px;
   cursor: pointer;
   transition: background-color 0.3s ease;
+  width: 100%;
 }
 
 .button:hover {
   background-color: var(--button-hover);
 }
 
-.response {
+/* Wallet Button Container */
+.wallet-button-wrapper {
   margin-top: 1rem;
-  color: var(--response-color);
+  display: flex;
+  justify-content: center;
+  animation: fadeInUp 0.6s ease forwards;
 }
 
-/* Toggle Switch Styles */
+.wallet-button-wrapper img {
+  max-width: 220px;
+  width: 100%;
+  height: auto;
+}
+
+/* Wallet button animation */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Theme Toggle Switch */
 .theme-toggle {
   position: absolute;
   top: 1rem;
@@ -154,12 +203,14 @@ input:checked + .slider:before {
   border-radius: 34px;
 }
 
+/* Sign-In Area */
 .signin-wrapper {
   display: flex;
   justify-content: center;
   margin-bottom: 1rem;
 }
 
+/* Signed-in Message */
 .signed-in-as {
   background-color: var(--input-bg);
   color: var(--text-color);
@@ -176,38 +227,24 @@ input:checked + .slider:before {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
-/* .signed-in-as::before {
+.signed-in-as::before {
   content: '👤';
   font-size: 1rem;
-} */
+}
 
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
+/* Mobile-specific tweaks */
+@media (max-width: 480px) {
+  .form-title {
+    font-size: 1.25rem;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+
+  .button, .input {
+    font-size: 1rem;
+    padding: 0.65rem 1rem;
   }
-}
 
-.wallet-button-wrapper {
-  margin-top: 1rem;
-  display: flex;
-  justify-content: center;
-}
-
-.wallet-button-wrapper.animate {
-  animation: fadeInUp 0.6s ease forwards;
-}
-
-.wallet-button-wrapper img {
-  max-width: 220px;
-  width: 100%;
-  height: auto;
-}
-
-#createPassSubmit {
-  display: none;
+  .signed-in-as {
+    font-size: 0.9rem;
+    padding: 0.5rem 0.75rem;
+  }
 }

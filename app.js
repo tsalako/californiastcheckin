@@ -270,7 +270,7 @@ const claims = {
 const token = jwt.sign(claims, credentials.private_key, { algorithm: 'RS256' });
 const saveUrl = `https://pay.google.com/gp/v/save/${token}`;
 
-res.send(`<a href='${saveUrl}'><img src='wallet-button.png'></a>`);
+res.send(`${saveUrl}`);
 console.log('adding to screen');
 }
 

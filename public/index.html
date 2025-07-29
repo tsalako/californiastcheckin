@@ -20,6 +20,7 @@ the License.
 <title>California St. Dreaming</title>
 <head>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="//fonts.googleapis.com/css?family=Roboto:100,300,400,500,700%7CGoogle+Sans:400,500%7CGoogle+Sans+Text:400,700%7CProduct+Sans:400" />
 <link rel="stylesheet" href="style.css" />
 </head>
@@ -35,31 +36,35 @@ the License.
   <div id="content" class="container">
     <h2 class="form-title">Create Your Wallet Pass</h2>
 
-    <!-- Sign In -->
-    <div id="signinWrapper" class="signin-wrapper">
-      <div id="g_id_onload"
-           data-client_id="65103160055-ugejq1km2u3koba5977k35qjcgsc4nbi.apps.googleusercontent.com"
-           data-callback="onSignIn"
-           data-auto_prompt="false">
+    <div class="form-content">
+      <!-- Google Sign-In Button -->
+      <div id="signinWrapper" class="signin-wrapper">
+        <div id="g_id_onload"
+            data-client_id="65103160055-ugejq1km2u3koba5977k35qjcgsc4nbi.apps.googleusercontent.com"
+            data-callback="onSignIn"
+            data-auto_prompt="false">
+        </div>
+        <div class="g_id_signin"
+            data-type="standard"
+            data-size="large"
+            data-theme="outline"
+            data-text="sign_in_with"
+            data-shape="rectangular"
+            data-logo_alignment="left">
+        </div>
       </div>
-      <div class="g_id_signin"
-           data-type="standard"
-           data-size="large"
-           data-theme="outline"
-           data-text="sign_in_with"
-           data-shape="rectangular"
-           data-logo_alignment="left">
+
+      <!-- Signed-in Message -->
+      <p id="signedInAs" class="signed-in-as hidden">👤 Signed in as John Doe</p>
+
+      <!-- Create Pass Button -->
+      <button id="createPassSubmit" class="button hidden">Create pass</button>
+
+      <!-- Wallet Button Output -->
+      <div id="button" class="wallet-button-wrapper hidden">
+        <a href='' id="walletLink"><img src='wallet-button.png'></a>
       </div>
     </div>
-
-    <!-- Show signed in name -->
-    <p id="signedInAs" class="signed-in-as" style="display:none;"></p>
-
-    <!-- Create Pass -->
-    <form id="createPass" class="form">
-      <input type="submit" value="Create pass" id="createPassSubmit" class="button">
-      <div id="button" class="wallet-button-wrapper"></div>
-    </form>
 
     <!-- Record Visit -->
     <form id="recordVisit">
@@ -82,20 +87,20 @@ the License.
       localStorage.setItem('idToken', idToken);
       localStorage.setItem('name', fullName);
 
-      // Hide sign-in button
-      document.getElementById('signinWrapper').style.display = 'none';
-
       // Show "Signed in as..."
       const signedInEl = document.getElementById('signedInAs');
       signedInEl.textContent = `${fullName}`;
-      signedInEl.style.display = 'block';
+      signedInEl.classList.remove('hidden');
 
-      // Show "Create Pass" button
-      document.getElementById('createPassSubmit').style.display = 'block';
+      // Show the create button
+      document.getElementById('createPassSubmit').classList.remove('hidden');
+
+      // Hide the sign-in button visually, not destructively
+      document.getElementById('signinWrapper').classList.add('hidden');
     }
 
-    document.getElementById('createPass').addEventListener('submit', e => {
-      e.preventDefault();
+    document.getElementById('createPassSubmit').addEventListener('click', e => {
+      e.preventDefault(); 
 
       const email = localStorage.getItem('userEmail');
       const name = localStorage.getItem('name');
@@ -114,9 +119,9 @@ the License.
         body: `name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&idToken=${encodeURIComponent(token)}`,
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
       }).then(res => res.text())
-        .then(button => {
-          const container = document.getElementById('button');
-          container.innerHTML = button;
+        .then(saveUrl => {
+          document.getElementById('walletLink').href = saveUrl;
+          container.classList.remove('hidden');
           container.classList.add('animate');
         });
     });
