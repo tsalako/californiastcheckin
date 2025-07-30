@@ -18,7 +18,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const { GoogleAuth, OAuth2Client } = require('google-auth-library');
 const jwt = require('jsonwebtoken');
-const { format } = require('date-fns');
+const { formatInTimeZone } = require('date-fns-tz');
 
 const issuerId = '3388000000022959009';
 
@@ -129,7 +129,7 @@ async function recordVisit(req, res) {
     const patchBody = {
       loyaltyPoints: { balance: { int: currentPoints + 1 } },
       secondaryLoyaltyPoints: {
-        balance: { string: format(now, "iii PP p") }
+        balance: { string: formatInTimeZone(now, 'America/Los_Angeles', 'iii PP p') }
       },
       infoModuleData: {
         labelValueRows: [
