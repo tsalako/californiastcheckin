@@ -22,9 +22,9 @@ const { format } = require('date-fns');
 
 const issuerId = '3388000000022959009';
 
-const classSuffix = 'csd';
+const classSuffix = 'csd_staging';
 
-const postpend = ""
+const postpend = "_staging"
 
 const classId = `${issuerId}.${classSuffix}${postpend}`;
 
