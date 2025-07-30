@@ -24,7 +24,7 @@ const issuerId = '3388000000022959009';
 
 const classSuffix = 'csd';
 
-const postpend = "_1"
+const postpend = ""
 
 const classId = `${issuerId}.${classSuffix}${postpend}`;
 
