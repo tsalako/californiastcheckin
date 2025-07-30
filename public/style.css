@@ -1,6 +1,11 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* Body layout */
 body {
   font-family: 'Google Sans', 'Roboto', sans-serif;
-  background-color: #f5f7fa;
+  background-color: var(--bg-color, #f5f7fa);
   margin: 0;
   padding: 0;
   display: flex;
@@ -9,14 +14,24 @@ body {
   align-items: center;
 }
 
+/* Main container */
 .container {
-  background-color: white;
-  padding: 2rem;
+  background-color: var(--card-bg, #ffffff);
+  padding: 2rem 1.5rem;
   border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-  max-width: 480px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   width: 100%;
-  box-sizing: border-box;
+  max-width: 480px;
+  margin: 2rem 1rem;
+}
+
+/* Responsive form layout */
+.form-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
 }
 
 .form-title {
@@ -26,14 +41,7 @@ body {
   margin-bottom: 1.5rem;
 }
 
-.form-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-  width: 100%;
-}
-
+/* Unified slot layout */
 .stack-slot {
   position: relative;
   width: 100%;
@@ -43,9 +51,7 @@ body {
 
 .slot-item {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
+  top: 0; left: 0; right: 0;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -64,6 +70,7 @@ body {
   pointer-events: auto;
 }
 
+/* Buttons */
 .button {
   width: 100%;
   max-width: 320px;
@@ -76,14 +83,13 @@ body {
   font-weight: 500;
   cursor: pointer;
   transition: background-color 0.3s ease;
-  box-sizing: border-box;
-  text-align: center;
 }
 
 .button:hover {
   background-color: #3367d6;
 }
 
+/* Signed-in message */
 .signed-in-as {
   background-color: #f0f0f0;
   color: #1e1e1e;
@@ -92,12 +98,12 @@ body {
   padding: 0.5rem 1rem;
   font-size: 0.95rem;
   font-weight: 500;
-  text-align: center;
-  box-sizing: border-box;
   width: 100%;
   max-width: 320px;
+  text-align: center;
 }
 
+/* Feedback + Wallet Button */
 .feedback-wallet-wrapper {
   width: 100%;
   max-width: 320px;
@@ -135,4 +141,21 @@ body {
   max-width: 220px;
   width: 100%;
   height: auto;
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+  .form-title {
+    font-size: 1.25rem;
+  }
+
+  .button {
+    font-size: 1rem;
+    padding: 0.65rem 1rem;
+  }
+
+  .signed-in-as {
+    font-size: 0.9rem;
+    padding: 0.5rem 0.75rem;
+  }
 }
