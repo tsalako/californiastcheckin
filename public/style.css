@@ -1,64 +1,27 @@
-/* Root Theme Variables */
-:root {
-  --bg-color: #f5f7fa;
-  --text-color: #1e1e1e;
-  --card-bg: #ffffff;
-  --input-bg: #ffffff;
-  --input-border: #ccc;
-  --placeholder: #777;
-  --button-bg: #4285f4;
-  --button-hover: #3367d6;
-  --response-color: #333;
-}
-
-body.dark {
-  --bg-color: #121212;
-  --text-color: #e0e0e0;
-  --card-bg: #1e1e1e;
-  --input-bg: #2a2a2a;
-  --input-border: #444;
-  --placeholder: #aaa;
-  --button-bg: #2196f3;
-  --button-hover: #1976d2;
-  --response-color: #a0a0a0;
-}
-
-/* Global Layout */
 body {
   font-family: 'Google Sans', 'Roboto', sans-serif;
-  background-color: var(--bg-color);
-  color: var(--text-color);
+  background-color: #f5f7fa;
   margin: 0;
   padding: 0;
   display: flex;
   min-height: 100vh;
   justify-content: center;
   align-items: center;
-  box-sizing: border-box;
 }
 
-/* Main Container */
 .container {
-  background-color: var(--card-bg);
-  padding: 2rem 1.5rem;
+  background-color: white;
+  padding: 2rem;
   border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  width: 100%;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
   max-width: 480px;
-  margin: 2rem;
+  width: 100%;
   box-sizing: border-box;
-}
-
-/* Form Structure */
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
 }
 
 .form-title {
   font-size: 1.5rem;
-  font-weight: 600;
+  font-weight: bold;
   text-align: center;
   margin-bottom: 1.5rem;
 }
@@ -67,184 +30,109 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.75rem;
+  gap: 1rem;
   width: 100%;
 }
 
-.hidden {
+.stack-slot {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  min-height: 52px;
+}
+
+.slot-item {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.slot-item.hidden {
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
-  height: 0;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  transition: opacity 0.3s ease;
 }
 
-/* Inputs */
-.input {
-  padding: 0.75rem 1rem;
-  font-size: 1rem;
-  background-color: var(--input-bg);
-  border: 1px solid var(--input-border);
-  border-radius: 8px;
-  color: var(--text-color);
-  outline: none;
-  transition: border-color 0.3s ease, background-color 0.3s ease;
-  width: 100%;
+.slot-item.visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
 }
 
-.input::placeholder {
-  color: var(--placeholder);
-}
-
-.input:focus {
-  border-color: var(--button-bg);
-  background-color: var(--input-bg);
-}
-
-/* Buttons */
 .button {
+  width: 100%;
+  max-width: 320px;
   padding: 0.75rem 1rem;
-  background-color: var(--button-bg);
-  color: white;
-  font-weight: 500;
   font-size: 1rem;
   border: none;
   border-radius: 8px;
+  background-color: #4285f4;
+  color: white;
+  font-weight: 500;
   cursor: pointer;
   transition: background-color 0.3s ease;
-  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
 }
 
 .button:hover {
-  background-color: var(--button-hover);
+  background-color: #3367d6;
 }
 
-/* Wallet Button Container */
-.wallet-button-wrapper {
-  margin-top: 1rem;
+.signed-in-as {
+  background-color: #f0f0f0;
+  color: #1e1e1e;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  text-align: center;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 320px;
+}
+
+.feedback-wallet-wrapper {
+  width: 100%;
+  max-width: 320px;
+  min-height: 60px;
   display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  animation: fadeInUp 0.6s ease forwards;
+  gap: 0.5rem;
+  text-align: center;
+}
+
+.feedback {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: green;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.feedback.show {
+  opacity: 1;
+}
+
+.wallet-button-wrapper {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.wallet-button-wrapper.show {
+  opacity: 1;
 }
 
 .wallet-button-wrapper img {
   max-width: 220px;
   width: 100%;
   height: auto;
-}
-
-/* Wallet button animation */
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Theme Toggle Switch */
-.theme-toggle {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-}
-
-.switch {
-  position: relative;
-  display: inline-block;
-  width: 50px;
-  height: 26px;
-}
-
-.switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.slider {
-  position: absolute;
-  cursor: pointer;
-  background-color: #ccc;
-  border-radius: 34px;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  transition: .4s;
-}
-
-.slider:before {
-  position: absolute;
-  content: "";
-  height: 20px;
-  width: 20px;
-  left: 3px;
-  bottom: 3px;
-  background-color: white;
-  border-radius: 50%;
-  transition: .4s;
-}
-
-input:checked + .slider {
-  background-color: #2196f3;
-}
-
-input:checked + .slider:before {
-  transform: translateX(24px);
-}
-
-.slider.round {
-  border-radius: 34px;
-}
-
-/* Sign-In Area */
-.signin-wrapper {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 1rem;
-}
-
-/* Signed-in Message */
-.signed-in-as {
-  background-color: var(--input-bg);
-  color: var(--text-color);
-  border: 1px solid var(--input-border);
-  border-radius: 8px;
-  padding: 0.75rem 1rem;
-  margin: 0 auto 1.5rem auto;
-  width: fit-content;
-  font-size: 0.95rem;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-}
-
-.signed-in-as::before {
-  content: '👤';
-  font-size: 1rem;
-}
-
-/* Mobile-specific tweaks */
-@media (max-width: 480px) {
-  .form-title {
-    font-size: 1.25rem;
-  }
-
-  .button, .input {
-    font-size: 1rem;
-    padding: 0.65rem 1rem;
-  }
-
-  .signed-in-as {
-    font-size: 0.9rem;
-    padding: 0.5rem 0.75rem;
-  }
 }

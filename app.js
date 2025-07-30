@@ -22,11 +22,13 @@ const { format } = require('date-fns');
 
 const issuerId = '3388000000022959009';
 
-const classSuffix = 'code_loyalty';
+const classSuffix = 'csd';
 
 const postpend = ""
 
 const classId = `${issuerId}.${classSuffix}${postpend}`;
+
+const audience = '65103160055-ugejq1km2u3koba5977k35qjcgsc4nbi.apps.googleusercontent.com';
 
 const baseUrl = 'https://walletobjects.googleapis.com/walletobjects/v1';
 
@@ -39,58 +41,121 @@ const walletClient = new GoogleAuth({
 
 const authClient = new OAuth2Client();
 
-async function recordVisit(req) {
-  const { email } = req.body;
-  console.log(`recording visit for ${email}`);
+async function hasPass(req, res) {
+    const { email, idToken } = req.query;
 
-  let objectSuffix = `${email.replace(/[^\w.-]/g, '_')}`;
-  let objectId = `${issuerId}.${objectSuffix}${postpend}`;
+  if (!email || !idToken) return res.status(400).send('Missing credentials');
 
-  let response;
+  // Verify ID token
+  try {
+    const ticket = await authClient.verifyIdToken({
+      idToken,
+      audience: audience,
+    });
 
-    // Check if the object exists
-    try {
-      response = await walletClient.request({
-        url: `${baseUrl}/loyaltyObject/${objectId}`,
-        method: 'GET'
+    const payload = ticket.getPayload();
+    if (payload.email !== email) return res.status(403).send('Email mismatch');
+  } catch (err) {
+    console.error('Invalid token:', err);
+    return res.status(401).send('Invalid token');
+  }
+
+  // Check if pass exists
+  const objectSuffix = `${email.replace(/[^\w.-]/g, '_')}`;
+  let objectId = `${issuerId}.${classSuffix}.${objectSuffix}${postpend}`;
+  console.log(`suffix ${objectSuffix}`)
+  try {
+    const response = await walletClient.request({
+      url: `https://walletobjects.googleapis.com/walletobjects/v1/loyaltyObject/${objectId}`,
+      method: 'GET',
+    });
+    return res.status(200).json({ exists: true });
+  } catch (err) {
+    if (err.response?.status === 404) {
+      return res.status(200).json({ exists: false });
+    }
+    console.error('Check pass error:', err);
+    res.status(500).send('Error checking pass');
+  }
+}
+
+async function recordVisit(req, res) {
+ const { email, idToken } = req.body;
+
+  if (!email || !idToken) return res.status(400).send('Missing input');
+
+  try {
+    const ticket = await authClient.verifyIdToken({
+      idToken,
+      audience: audience,
+    });
+
+    const payload = ticket.getPayload();
+    if (payload.email !== email) return res.status(403).send('Email mismatch');
+  } catch (err) {
+    console.error('Invalid token:', err);
+    return res.status(401).send('Invalid token');
+  }
+
+  const objectSuffix = `${email.replace(/[^\w.-]/g, '_')}`;
+  let objectId = `${issuerId}.${classSuffix}.${objectSuffix}${postpend}`;
+  console.log(`suffix ${objectSuffix}`)
+
+  try {
+    const getResponse = await walletClient.request({
+      url: `https://walletobjects.googleapis.com/walletobjects/v1/loyaltyObject/${objectId}`,
+      method: 'GET',
+    });
+
+    const lastVisitRow = getResponse.data.infoModuleData?.labelValueRows?.find(
+      row => row.columns?.[0]?.label === "LastVisitTimestamp"
+    );
+
+    const lastVisitTime = parseInt(lastVisitRow?.columns?.[0]?.value || '0', 10);
+    const now = Date.now();
+    const cooldownMs = 5 * 60 * 1000;
+
+    if (now - lastVisitTime < cooldownMs) {
+      const remainingSeconds = Math.ceil((cooldownMs - (now - lastVisitTime)) / 1000);
+      return res.status(429).json({
+        message: `⏱ Please wait ${remainingSeconds} more seconds before recording again.`,
+        remainingSeconds
       });
-
-    } catch (err) {
-      if (err.response && err.response.status === 404) {
-        console.log(`Object ${objectId} not found!`);
-        return;
-      } else {
-        // Something else went wrong...
-        console.log(err);
-        return;
-      }
     }
 
-     // Object exists
-    let existingObject = response.data;
-    let currentVisits = existingObject['loyaltyPoints']['balance']['int']
+    const currentPoints = getResponse.data.loyaltyPoints?.balance?.int || 0;
 
-    let patchBody = {
-      'loyaltyPoints': {
-        'balance': {
-          'int': currentVisits + 1
-        }
+    const patchBody = {
+      loyaltyPoints: { balance: { int: currentPoints + 1 } },
+      secondaryLoyaltyPoints: {
+        balance: { string: format(now, "iii PP p") }
       },
-      "secondaryLoyaltyPoints": {
-        "balance": {
-          "string": `${format(new Date(), "iii PP p")}`,
-        },
-      },
+      infoModuleData: {
+        labelValueRows: [
+          {
+            columns: [
+              {
+                label: "LastVisitTimestamp",
+                value: now.toString()
+              }
+            ]
+          }
+        ]
+      }
     };
 
-    response = await walletClient.request({
-        url: `${baseUrl}/loyaltyObject/${objectId}`,
-        method: 'PATCH',
-        data: patchBody
-      });
 
-    console.log('Object patch response');
-    console.log(response);
+    await walletClient.request({
+      url: `https://walletobjects.googleapis.com/walletobjects/v1/loyaltyObject/${objectId}`,
+      method: 'PATCH',
+      data: patchBody,
+    });
+
+    res.status(200).send('Visit recorded');
+  } catch (err) {
+    console.error('Record visit error:', err);
+    res.status(500).send('Failed to record visit');
+  }
 }
 
 async function createPassClass(res) {
@@ -206,7 +271,7 @@ async function createPassObject(req, res, classId) {
   try {
     const ticket = await authClient.verifyIdToken({
       idToken,
-      audience: '65103160055-ugejq1km2u3koba5977k35qjcgsc4nbi.apps.googleusercontent.com' // from Google Cloud Console
+      audience: audience
     });
 
     const payload = ticket.getPayload();
@@ -222,7 +287,7 @@ async function createPassObject(req, res, classId) {
 
 
 const objectSuffix = `${email.replace(/[^\w.-]/g, '_')}`;
-let objectId = `${issuerId}.${objectSuffix}${postpend}`;
+let objectId = `${issuerId}.${classSuffix}.${objectSuffix}${postpend}`;
 console.log(`suffix ${objectSuffix}`)
 
 let loyaltyObject = {
@@ -250,6 +315,18 @@ let loyaltyObject = {
       'body': '👑'
     }
   ],
+  "infoModuleData": {
+    "labelValueRows": [
+      {
+        "columns" : [
+          {
+            "label": "LastVisitTimestamp",
+            "value": "N/A",
+          }
+        ]
+      }
+    ]
+  },
   "passConstraints": {
     "nfcConstraint": ["BLOCK_PAYMENT"]
   },
@@ -270,7 +347,7 @@ const claims = {
 const token = jwt.sign(claims, credentials.private_key, { algorithm: 'RS256' });
 const saveUrl = `https://pay.google.com/gp/v/save/${token}`;
 
-res.send(`${saveUrl}`);
+res.send(`<a href='${saveUrl}'><img src='wallet-button.png'></a>`);
 console.log('adding to screen');
 }
 
@@ -278,12 +355,15 @@ const app = express();
 
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(express.static('public'));
+app.get('/hasPass', async (req, res) => {
+  await hasPass(req, res);
+});
 app.post('/', async (req, res) => {
   await createPassClass(res);
   await createPassObject(req, res, classId);
 });
 app.post('/recordVisit', async (req, res) => {
-  await recordVisit(req);
+  await recordVisit(req, res);
 });
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
