@@ -111,12 +111,13 @@ async function recordVisit(req, res) {
       row => row.columns?.[0]?.label === "LastVisitTimestamp"
     );
 
-    const lastVisitTime = parseInt(lastVisitRow?.columns?.[0]?.value || '0', 10);
-    const now = Date.now();
+    const now = new Date()
+    const nowMillis = now.getTime();
     const cooldownMs = 5 * 60 * 1000;
 
-    if (now - lastVisitTime < cooldownMs) {
-      const remainingSeconds = Math.ceil((cooldownMs - (now - lastVisitTime)) / 1000);
+    const lastVisitTime = parseInt(lastVisitRow?.columns?.[0]?.value || '0', 10);
+    if (nowMillis - lastVisitTime < cooldownMs) {
+      const remainingSeconds = Math.ceil((cooldownMs - (nowMillis - lastVisitTime)) / 1000);
       return res.status(429).json({
         message: `⏱ Please wait ${remainingSeconds} more seconds before recording again.`,
         remainingSeconds
@@ -136,7 +137,7 @@ async function recordVisit(req, res) {
             columns: [
               {
                 label: "LastVisitTimestamp",
-                value: now.toString()
+                value: nowMillis.toString()
               }
             ]
           }
