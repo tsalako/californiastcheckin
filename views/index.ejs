@@ -14,7 +14,7 @@
     <div class="form-content">
       <!-- Identity -->
       <div class="stack-slot">
-        <div id="signinWrapper" class="slot-item visible">
+        <div id="signinWrapper" class="slot-item hidden">
           <div id="g_id_onload"
                data-client_id="<%= googleClientId %>"
                data-callback="onSignIn"
@@ -82,6 +82,28 @@
           }
         });
     }
+
+    window.addEventListener('DOMContentLoaded', () => {
+        const email = localStorage.getItem('userEmail');
+        if (!email) {
+            document.getElementById('signinWrapper').classList.replace('hidden', 'visible');
+            return;
+        }
+
+        const container = document.getElementById('button');
+        const idToken = ''; // not needed if bypassing identity
+
+        fetch(`/hasPass?email=${encodeURIComponent(email)}&platform=${platform}`)
+            .then(res => res.json())
+            .then(({ exists }) => {
+            if (exists) {
+                document.getElementById('signinWrapper').classList.replace('visible', 'hidden');
+                document.getElementById('signedInWrapper').classList.replace('hidden', 'visible');
+                document.getElementById('signedInAs').textContent = localStorage.getItem('name') || `${email}`;
+                document.getElementById('recordWrapper').classList.replace('hidden', 'visible');
+            }
+            });
+        });
 
     document.getElementById('createPassSubmit').addEventListener('click', e => {
       e.preventDefault();

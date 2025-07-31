@@ -33,7 +33,7 @@ async function verifyToken(email, idToken) {
 }
 
 async function hasGooglePass(email, idToken) {
-  await verifyToken(email, idToken);
+//   await verifyToken(email, idToken);
   const { objectId } = getObjectInfo(email);
   try {
     await walletClient.request({
@@ -48,7 +48,7 @@ async function hasGooglePass(email, idToken) {
 }
 
 async function createGooglePass(email, name, idToken) {
-  await verifyToken(email, idToken);
+//   await verifyToken(email, idToken);
   const { objectId } = getObjectInfo(email);
 
   const loyaltyObject = {
