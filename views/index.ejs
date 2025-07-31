@@ -140,8 +140,8 @@
         if (platform === 'apple' && data.pkpass) {
           const container = document.getElementById('button');
           const a = document.createElement('a');
-        //   a.href = `data:application/vnd.apple.pkpass;base64,${data.pkpass}`;
-          a.href = data.url;
+          a.href = `data:application/vnd.apple.pkpass;base64,${data.pkpass}`;
+        //   a.href = data.url;
           a.textContent = 'Download Updated Pass';
           a.className = 'button';
           container.innerHTML = '';
