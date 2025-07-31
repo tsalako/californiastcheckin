@@ -137,11 +137,10 @@
         const data = await res.json();
         feedbackEl.textContent = '✅ Visit recorded!';
         feedbackEl.classList.add('show');
-        if (platform === 'apple' && data.pkpass) {
+        if (platform === 'apple' && data.url) {
           const container = document.getElementById('button');
-          const a = document.createElement('a');
-          a.href = `data:application/vnd.apple.pkpass;base64,${data.pkpass}`;
-        //   a.href = data.url;
+          const a = document.createElement('a'); 
+          a.href = data.url;
           a.textContent = 'Download Updated Pass';
           a.className = 'button';
           container.innerHTML = '';

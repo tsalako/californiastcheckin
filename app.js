@@ -46,8 +46,8 @@ app.post('/create-pass', async (req, res) => {
   const { email, name, idToken, platform } = req.body;
   try {
     if (platform === 'apple') {
-      const pkpass = await createApplePass(email, name, false);
-      res.json({ pkpass });
+      const {pkpass, url } = await createApplePass(email, name, false);
+      res.json({ url });
     } else {
       await createPassClass();
       const button = await createGooglePass(email, name, idToken);
@@ -63,8 +63,8 @@ app.post('/record-visit', async (req, res) => {
   const { email, idToken, platform, name } = req.body;
   try {
     if (platform === 'apple') {
-      const updatedPkpass = await createApplePass(email, name, true);
-      res.json({ pkpass: updatedPkpass });
+      const { updatedPkpass, url } = await createApplePass(email, name, true);
+      res.json({ url });
     } else {
       try {
         await updatePassObject(email);

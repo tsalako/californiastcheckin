@@ -136,8 +136,6 @@ async function createApplePass(email, name, isUpdate = false) {
     responseDisposition: 'attachment; filename="pass.pkpass"',
   });
 
-  console.log(url);
-
   const [raw] = await file.download();
   const base64 = raw.toString('base64');
 
