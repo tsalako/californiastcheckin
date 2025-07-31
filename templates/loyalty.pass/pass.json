@@ -1,0 +1,12 @@
+{
+  "formatVersion": 1,
+  "passTypeIdentifier": "pass.com.app.californiastcheckin",
+  "serialNumber": "123456789",
+  "teamIdentifier": "FP27V8L4WY",
+  "organizationName": "California St Dreaming",
+  "description": "Loyalty Pass",
+  "logoText": "CSD Loyalty",
+  "foregroundColor": "rgb(255, 255, 255)",
+  "backgroundColor": "rgb(55, 117, 50)",
+  "storeCard" : {}
+}

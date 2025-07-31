@@ -2,7 +2,6 @@
   box-sizing: border-box;
 }
 
-/* Body layout */
 body {
   font-family: 'Google Sans', 'Roboto', sans-serif;
   background-color: var(--bg-color, #f5f7fa);
@@ -14,7 +13,6 @@ body {
   align-items: center;
 }
 
-/* Main container */
 .container {
   background-color: var(--card-bg, #ffffff);
   padding: 2rem 1.5rem;
@@ -25,7 +23,6 @@ body {
   margin: 2rem 1rem;
 }
 
-/* Responsive form layout */
 .form-content {
   display: flex;
   flex-direction: column;
@@ -41,7 +38,6 @@ body {
   margin-bottom: 1.5rem;
 }
 
-/* Unified slot layout */
 .stack-slot {
   position: relative;
   width: 100%;
@@ -70,7 +66,6 @@ body {
   pointer-events: auto;
 }
 
-/* Buttons */
 .button {
   width: 100%;
   max-width: 320px;
@@ -82,6 +77,7 @@ body {
   color: white;
   font-weight: 500;
   cursor: pointer;
+  text-align: center;
   transition: background-color 0.3s ease;
 }
 
@@ -89,7 +85,6 @@ body {
   background-color: #3367d6;
 }
 
-/* Signed-in message */
 .signed-in-as {
   background-color: #f0f0f0;
   color: #1e1e1e;
@@ -103,7 +98,6 @@ body {
   text-align: center;
 }
 
-/* Feedback + Wallet Button */
 .feedback-wallet-wrapper {
   width: 100%;
   max-width: 320px;
@@ -143,7 +137,6 @@ body {
   height: auto;
 }
 
-/* Responsive adjustments */
 @media (max-width: 480px) {
   .form-title {
     font-size: 1.25rem;

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>California St. Check-in</title>
+  <link rel="stylesheet" href="/style.css" />
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+  <div class="container">
+    <h2 class="form-title">California St. Check-in</h2>
+
+    <div class="form-content">
+      <!-- Identity -->
+      <div class="stack-slot">
+        <div id="signinWrapper" class="slot-item visible">
+          <div id="g_id_onload"
+               data-client_id="<%= googleClientId %>"
+               data-callback="onSignIn"
+               data-auto_prompt="false">
+          </div>
+          <div class="g_id_signin"
+               data-type="standard"
+               data-size="large"
+               data-theme="outline"
+               data-text="sign_in_with"
+               data-shape="rectangular"
+               data-logo_alignment="left">
+          </div>
+        </div>
+        <div id="signedInWrapper" class="slot-item hidden">
+          <p id="signedInAs" class="signed-in-as"></p>
+        </div>
+      </div>
+
+      <!-- Action buttons -->
+      <div class="stack-slot">
+        <div id="createWrapper" class="slot-item hidden">
+          <button id="createPassSubmit" class="button">Create Pass</button>
+        </div>
+        <div id="recordWrapper" class="slot-item hidden">
+          <button id="recordVisit" class="button">Record Visit</button>
+        </div>
+      </div>
+
+      <!-- Feedback + Wallet -->
+      <div class="feedback-wallet-wrapper">
+        <div id="feedback" class="feedback" aria-live="polite"></div>
+        <div id="button" class="wallet-button-wrapper"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let idToken = '', userEmail = '', fullName = '';
+    let isRecording = false;
+    const isApple = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const platform = isApple ? 'apple' : 'google';
+
+    function onSignIn(response) {
+      idToken = response.credential;
+      const payload = JSON.parse(atob(idToken.split('.')[1]));
+      userEmail = payload.email;
+      fullName = payload.name;
+
+      localStorage.setItem('userEmail', userEmail);
+      localStorage.setItem('idToken', idToken);
+      localStorage.setItem('name', fullName);
+
+      document.getElementById('signinWrapper').classList.replace('visible', 'hidden');
+      document.getElementById('signedInWrapper').classList.replace('hidden', 'visible');
+      document.getElementById('signedInAs').textContent = `${fullName}`;
+
+      fetch(`/hasPass?email=${encodeURIComponent(userEmail)}&idToken=${encodeURIComponent(idToken)}&platform=${platform}`)
+        .then(res => res.json())
+        .then(({ exists }) => {
+          if (exists) {
+            document.getElementById('recordWrapper').classList.replace('hidden', 'visible');
+          } else {
+            document.getElementById('createWrapper').classList.replace('hidden', 'visible');
+          }
+        });
+    }
+
+    document.getElementById('createPassSubmit').addEventListener('click', e => {
+      e.preventDefault();
+      const email = localStorage.getItem('userEmail');
+      const name = localStorage.getItem('name');
+      const token = localStorage.getItem('idToken');
+      const container = document.getElementById('button');
+
+      fetch(`/create-pass`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&idToken=${encodeURIComponent(token)}&platform=${platform}`
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (platform === 'apple') {
+          const a = document.createElement('a');
+          a.href = `data:application/vnd.apple.pkpass;base64,${data.pkpass}`;
+          a.download = 'pass.pkpass';
+          a.textContent = 'Download Pass';
+          a.className = 'button';
+          container.innerHTML = '';
+          container.appendChild(a);
+        } else {
+          const a = document.createElement('a');
+            a.href = data.button;
+            a.innerHTML = `<img src="wallet-button.png" alt="Save to Google Wallet">`;
+            container.innerHTML = '';
+            container.appendChild(a);
+        }
+        container.classList.add('show');
+      });
+    });
+
+    document.getElementById('recordVisit').addEventListener('click', async () => {
+      if (isRecording) return;
+
+      isRecording = true;
+      const button = document.getElementById('recordVisit');
+      button.disabled = true;
+
+      const email = localStorage.getItem('userEmail');
+      const idToken = localStorage.getItem('idToken');
+      const feedbackEl = document.getElementById('feedback');
+
+      const res = await fetch('/record-visit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `email=${encodeURIComponent(email)}&idToken=${encodeURIComponent(idToken)}&platform=${platform}`
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        feedbackEl.textContent = '✅ Visit recorded!';
+        feedbackEl.classList.add('show');
+        if (platform === 'apple' && data.pkpass) {
+          const container = document.getElementById('button');
+          const a = document.createElement('a');
+        //   a.href = `data:application/vnd.apple.pkpass;base64,${data.pkpass}`;
+          a.href = data.url;
+          a.textContent = 'Download Updated Pass';
+          a.className = 'button';
+          container.innerHTML = '';
+          container.appendChild(a);
+          container.classList.add('show');
+        }
+      } else {
+        const data = await res.json().catch(() => ({}));
+        feedbackEl.textContent = data.message || '⚠️ Failed to record visit.';
+        feedbackEl.classList.add('show');
+      }
+
+      setTimeout(() => feedbackEl.classList.remove('show'), 3000);
+      setTimeout(() => {
+        isRecording = false;
+        button.disabled = false;
+      }, 3000);
+    });
+  </script>
+</body>
+</html>
