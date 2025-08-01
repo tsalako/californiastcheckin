@@ -1,4 +1,4 @@
-// const fetch = require('node-fetch');
+const fetch = require('node-fetch');
 const express = require('express');
 const bodyParser = require('body-parser');
 const path = require('path');
@@ -58,6 +58,7 @@ app.post('/create-pass', async (req, res) => {
       const button = await createGooglePass(email, name, idToken);
       res.json({ button });
     }
+    console.log(`${name} created a pass and checked in.`);
   } catch (err) {
     console.error('create-pass error:', err);
     res.status(500).json({ error: 'Failed to create pass' });
@@ -74,6 +75,7 @@ app.post('/record-visit', async (req, res) => {
       try {
         await updatePassObject(email);
         res.status(200).json({ message: 'Visit recorded' });
+        console.log(`${name} checked in.`);
       } catch (err) {
         if (err.statusCode === 429) {
           res.status(429).json({ message: err.message, remainingSeconds: err.remainingSeconds });
@@ -95,9 +97,9 @@ app.listen(PORT, () => {
   console.log(`✅ Server listening on port ${PORT}`);
 });
 
-// // Ping /healthz every 14 minutes to prevent sleeping
-// setInterval(() => {
-//   fetch('https://californiastcheckin.onrender.com/healthz')
-//     .then(res => console.log(`[healthz] Ping success: ${res.status}`))
-//     .catch(err => console.error('[healthz] Ping failed:', err));
-// }, 14 * 60 * 1000); // 14 minutes
+// Ping /healthz every 14 minutes to prevent sleeping
+setInterval(() => {
+  fetch('https://californiastcheckin.onrender.com/healthz')
+    .then(res => console.log(`[healthz] Ping success: ${res.status}`))
+    .catch(err => console.error('[healthz] Ping failed:', err));
+}, 14 * 60 * 1000); // 14 minutes

@@ -164,11 +164,12 @@
 
       const email = localStorage.getItem('userEmail');
       const idToken = localStorage.getItem('idToken');
+      const name = localStorage.getItem('name');
 
       const res = await fetch('/record-visit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `email=${encodeURIComponent(email)}&idToken=${encodeURIComponent(idToken)}&platform=${platform}`
+        body: `name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&idToken=${encodeURIComponent(idToken)}&platform=${platform}`
       });
 
       if (res.ok) {

@@ -10,7 +10,7 @@
     "google-auth-library": ">=5.9.2",
     "googleapis": "^154.1.0",
     "jsonwebtoken": ">=8.5.1",
-    "node-fetch": "^3.3.2",
+    "node-fetch": "^2.7.0",
     "passkit-generator": "^3.4.0",
     "tmp-promise": "^3.0.3"
   }
