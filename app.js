@@ -1,4 +1,4 @@
-// Add to app.js
+// const fetch = require('node-fetch');
 const express = require('express');
 const bodyParser = require('body-parser');
 const path = require('path');
@@ -22,11 +22,16 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.use(express.static('public'));
 app.use(bodyParser.urlencoded({ extended: true }));
+// app.use(express.json());
 
 app.get('/', (req, res) => {
   res.render('index', {
     googleClientId: process.env.GCP_PROJECT_ID
   });
+});
+
+app.get('/healthz', (req, res) => {
+  res.send('success');
 });
 
 app.get('/hasPass', async (req, res) => {
@@ -89,3 +94,10 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Server listening on port ${PORT}`);
 });
+
+// // Ping /healthz every 14 minutes to prevent sleeping
+// setInterval(() => {
+//   fetch('https://californiastcheckin.onrender.com/healthz')
+//     .then(res => console.log(`[healthz] Ping success: ${res.status}`))
+//     .catch(err => console.error('[healthz] Ping failed:', err));
+// }, 14 * 60 * 1000); // 14 minutes

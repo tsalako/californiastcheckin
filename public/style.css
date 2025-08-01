@@ -152,3 +152,8 @@ body {
     padding: 0.5rem 0.75rem;
   }
 }
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

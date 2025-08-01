@@ -6,7 +6,8 @@ require('dotenv').config();
 
 const issuerId = process.env.GOOGLE_WALLET_ISSUER_ID;
 const ENVIRONMENT = process.env.NODE_ENV || 'development';
-const ENV_SUFFIX = ENVIRONMENT === 'production' ? '' : '_staging';
+const isProduction = ENVIRONMENT === 'production';
+const ENV_SUFFIX = isProduction ? '' : '_staging';
 const classSuffix = `csd${ENV_SUFFIX}`;
 const postpend = process.env.GOOGLE_WALLET_POSTPEND || ENV_SUFFIX;
 const classId = `${issuerId}.${classSuffix}`;
@@ -19,6 +20,8 @@ const walletClient = new GoogleAuth({
   credentials,
   scopes: 'https://www.googleapis.com/auth/wallet_object.issuer'
 });
+
+const visitThrottleEnabled = isProduction
 
 function getObjectInfo(email) {
   const objectSuffix = email.replace(/[^\w.-]/g, '_');
@@ -51,17 +54,21 @@ async function createGooglePass(email, name, idToken) {
 //   await verifyToken(email, idToken);
   const { objectId } = getObjectInfo(email);
 
+  const now = new Date();
+  const nowFormatted = formatInTimeZone(now, 'America/Los_Angeles', 'iii PP p');
+  const nowMillis = now.getTime();
+
   const loyaltyObject = {
     accountName: name,
-    loyaltyPoints: { label: 'Visits', balance: { int: 0 } },
-    secondaryLoyaltyPoints: { label: 'Last Visit', balance: { string: 'N/A' } },
+    loyaltyPoints: { label: 'Visits', balance: { int: 1 } },
+    secondaryLoyaltyPoints: { label: 'Last Visit', balance: { string: nowFormatted } },
     id: objectId,
     classId,
     state: 'ACTIVE',
     smartTapRedemptionValue: email,
     textModulesData: [{ id: 'og_status', header: 'OG Status', body: '👑' }],
     infoModuleData: {
-      labelValueRows: [{ columns: [{ label: 'LastVisitTimestamp', value: 'N/A' }] }]
+      labelValueRows: [{ columns: [{ label: 'LastVisitTimestamp', value: nowMillis.toString() }] }]
     },
     passConstraints: { nfcConstraint: ['BLOCK_PAYMENT'] }
   };
@@ -77,6 +84,25 @@ async function createGooglePass(email, name, idToken) {
   return `https://pay.google.com/gp/v/save/${token}`;
 }
 
+function areSameDayPST(ms1, ms2) {
+  const date1 = new Date(ms1);
+  const date2 = new Date(ms2);
+
+  // Create DateTimeFormat objects for "America/Los_Angeles" (PST/PDT)
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    timeZone: 'America/Los_Angeles',
+  });
+
+  // Extract the formatted date strings for comparison
+  const formattedDate1 = formatter.format(date1);
+  const formattedDate2 = formatter.format(date2);
+
+  return formattedDate1 === formattedDate2;
+}
+
 async function updatePassObject(email) {
   const { objectId } = getObjectInfo(email);
 
@@ -90,18 +116,13 @@ async function updatePassObject(email) {
   );
 
   const now = new Date();
+  const nowFormatted = formatInTimeZone(now, 'America/Los_Angeles', 'iii PP p');
   const nowMillis = now.getTime();
-  const cooldownMs = 5 * 60 * 1000; // 5 minutes
 
   const lastVisitTime = parseInt(lastVisitRow?.columns?.[0]?.value || '0', 10);
-  const remainingMs = cooldownMs - (nowMillis - lastVisitTime);
 
-  if (!isNaN(lastVisitTime) && remainingMs > 0) {
-    const remainingSeconds = Math.ceil(remainingMs / 1000);
-    const err = new Error(`⏱ Please wait ${remainingSeconds} more seconds before recording again.`);
-    err.statusCode = 429;
-    err.remainingSeconds = remainingSeconds;
-    throw err;
+  if (visitThrottleEnabled && !isNaN(lastVisitTime) && areSameDayPST(nowMillis, lastVisitTime)) {
+     throw new Error("Already checked in today.");
   }
 
   const currentPoints = getResponse.data.loyaltyPoints?.balance?.int || 0;
@@ -109,7 +130,7 @@ async function updatePassObject(email) {
   const patchBody = {
     loyaltyPoints: { balance: { int: currentPoints + 1 } },
     secondaryLoyaltyPoints: {
-      balance: { string: formatInTimeZone(now, 'America/Los_Angeles', 'iii PP p') }
+      balance: { string: nowFormatted }
     },
     infoModuleData: {
       labelValueRows: [

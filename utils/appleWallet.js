@@ -14,6 +14,10 @@ const metaDir = 'meta';
 const certDir = 'apple';
 const passOutputDir = 'apple/passes';
 
+const ENVIRONMENT = process.env.NODE_ENV || 'development';
+const isProduction = ENVIRONMENT === 'production';
+const visitThrottleEnabled = isProduction
+
 function getObjectInfo(email) {
   const objectSuffix = email.replace(/[^\w-]/g, '_').replace(/\./g, '_');
   return {
@@ -47,6 +51,25 @@ async function getCertFiles() {
   };
 }
 
+function areSameDayPST(ms1, ms2) {
+  const date1 = new Date(ms1);
+  const date2 = new Date(ms2);
+
+  // Create DateTimeFormat objects for "America/Los_Angeles" (PST/PDT)
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    timeZone: 'America/Los_Angeles',
+  });
+
+  // Extract the formatted date strings for comparison
+  const formattedDate1 = formatter.format(date1);
+  const formattedDate2 = formatter.format(date2);
+
+  return formattedDate1 === formattedDate2;
+}
+
 async function createApplePass(email, name, isUpdate = false) {
   const { cert, key, wwdr } = await getCertFiles();
   const { objectSuffix, passFile, metaFile } = getObjectInfo(email);
@@ -58,39 +81,48 @@ async function createApplePass(email, name, isUpdate = false) {
     metadata = {};
   }
 
+  const now = new Date();
+  const nowFormatted = formatInTimeZone(now, 'America/Los_Angeles', 'iii PP p');
+  const nowMillis = now.getTime();
+
+  const visitField = metadata.auxiliaryFields?.find(f => f.key === 'visits');
+  const visitCount = (parseInt(visitField?.value || 0) + 1);
+
   if (!isUpdate) {
     metadata.serialNumber = objectSuffix;
     // These fields are not actually set through "metadata" they are manually
     // added to the pass after creation.
     metadata.auxiliaryFields = [
-            { key: 'visits', label: 'Visits', value: "0" },
-            { key: 'lastvisit', label: 'Last Visit', value: 'N/A' }
+            { key: 'visits', label: 'Visits', value: `${visitCount}` },
+            { key: 'lastvisit', label: 'Last Visit', value: nowFormatted }
         ];
     metadata.backFields = [
             { key: 'name_back', label: 'Dreamer Name', value: name },
             { key: 'level_back', label: 'Level', value: 'Snoozer' },
-            { key: 'visits_back', label: 'Visits', value: "0" },
-            { key: 'lastvisit_back', label: 'Last Visit', value: 'N/A' },
-            { key: 'lastvisittimestamp_back', label: 'LastVisitTimestamp', value: 'N/A' }
+            { key: 'visits_back', label: 'Visits', value: `${visitCount}` },
+            { key: 'lastvisit_back', label: 'Last Visit', value: nowFormatted },
+            { key: 'lastvisittimestamp_back', label: 'LastVisitTimestamp', value: nowMillis.toString() }
         ];
   } else {
-    const visitField = metadata.auxiliaryFields?.find(f => f.key === 'visits');
-    if (visitField) visitField.value = (parseInt(visitField.value || 0) + 1);
+  const lastVisitTimestampBackField = metadata.backFields?.find(f => f.key === 'lastvisittimestamp_back');
+  const lastVisitTime = parseInt(lastVisitTimestampBackField?.value || '0', 10);
+    
+  if (visitThrottleEnabled && !isNaN(lastVisitTime) && areSameDayPST(nowMillis, lastVisitTime)) {
+     throw new Error("Already checked in today.");
+  }
 
-    const now = new Date();
-    const formatted = formatInTimeZone(now, 'America/Los_Angeles', 'iii PP p');
+    if (visitField) visitField.value = visitCount;
+
     const lastVisitField = metadata.auxiliaryFields?.find(f => f.key === 'lastvisit');
-    if (lastVisitField) lastVisitField.value = formatted;
+    if (lastVisitField) lastVisitField.value = nowFormatted;
 
     const visitBackField = metadata.backFields?.find(f => f.key === 'visits_back');
-    if (visitBackField) visitBackField.value = (parseInt(visitBackField.value || 0) + 1);
+    if (visitBackField) visitBackField.value = visitCount;
 
     const lastVisitBackField = metadata.backFields?.find(f => f.key === 'lastvisit_back');
-    if (lastVisitBackField) lastVisitBackField.value = formatted;
+    if (lastVisitBackField) lastVisitBackField.value = nowFormatted;
 
-    // check this and add throttle
-     const lastVisitTimestampBackField = metadata.backFields?.find(f => f.key === 'lastvisittimestamp_back');
-    if (lastVisitTimestampBackField) lastVisitTimestampBackField.value = now.getTime().toString();
+    if (lastVisitTimestampBackField) lastVisitTimestampBackField.value = nowMillis.toString();
   }
 
   const pass = await PKPass.from({

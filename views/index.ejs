@@ -58,6 +58,8 @@
     const isApple = /iPhone|iPad|iPod/i.test(navigator.userAgent);
     const platform = isApple ? 'apple' : 'google';
 
+    const feedbackEl = document.getElementById('feedback');
+
     function onSignIn(response) {
       idToken = response.credential;
       const payload = JSON.parse(atob(idToken.split('.')[1]));
@@ -105,28 +107,36 @@
     //         });
     //     });
 
-    document.getElementById('createPassSubmit').addEventListener('click', e => {
-      e.preventDefault();
+    const createPassSubmit = document.getElementById('createPassSubmit');
+    createPassSubmit.disabled = false;
+    createPassSubmit.textContent = "Create Pass";
+
+    createPassSubmit.addEventListener('click', async () => {
+      createPassSubmit.disabled = true;
+      createPassSubmit.textContent = "Creating...";
+
       const email = localStorage.getItem('userEmail');
       const name = localStorage.getItem('name');
       const token = localStorage.getItem('idToken');
       const container = document.getElementById('button');
 
-      fetch(`/create-pass`, {
+      const res = await fetch(`/create-pass`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: `name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&idToken=${encodeURIComponent(token)}&platform=${platform}`
-      })
-      .then(res => res.json())
-      .then(data => {
+      });
+
+        if (res.ok) {
+            const data = await res.json();
+            createPassSubmit.textContent = "Created";
         if (platform === 'apple') {
           const a = document.createElement('a');
-          a.href = `data:application/vnd.apple.pkpass;base64,${data.pkpass}`;
-          a.download = 'pass.pkpass';
+          a.href = data.url;
           a.textContent = 'Download Pass';
           a.className = 'button';
           container.innerHTML = '';
           container.appendChild(a);
+          container.classList.add('show');
         } else {
           const a = document.createElement('a');
             a.href = data.button;
@@ -135,19 +145,25 @@
             container.appendChild(a);
         }
         container.classList.add('show');
-      });
+        } else {
+        const data = await res.json().catch(() => ({}));
+        feedbackEl.textContent = data.message || '⚠️ Failed to create pass.';
+        feedbackEl.classList.add('show');
+        createPassSubmit.textContent = "Create Pass";
+        createPassSubmit.disabled = false;
+        }
     });
 
-    document.getElementById('recordVisit').addEventListener('click', async () => {
-      if (isRecording) return;
+    const recordVisit = document.getElementById('recordVisit');
+    recordVisit.disabled = false;
+    recordVisit.textContent = "Record Visit";
 
-      isRecording = true;
-      const button = document.getElementById('recordVisit');
-      button.disabled = true;
+    recordVisit.addEventListener('click', async () => {
+     recordVisit.disabled = true;
+     recordVisit.textContent = "Recording...";
 
       const email = localStorage.getItem('userEmail');
       const idToken = localStorage.getItem('idToken');
-      const feedbackEl = document.getElementById('feedback');
 
       const res = await fetch('/record-visit', {
         method: 'POST',
@@ -156,9 +172,8 @@
       });
 
       if (res.ok) {
+        recordVisit.textContent = "Recorded!";
         const data = await res.json();
-        feedbackEl.textContent = '✅ Visit recorded!';
-        feedbackEl.classList.add('show');
         if (platform === 'apple' && data.url) {
           const container = document.getElementById('button');
           const a = document.createElement('a'); 
@@ -173,13 +188,11 @@
         const data = await res.json().catch(() => ({}));
         feedbackEl.textContent = data.message || '⚠️ Failed to record visit.';
         feedbackEl.classList.add('show');
+        recordVisit.textContent = "Record Visit";
+        recordVisit.disabled = false;
       }
 
       setTimeout(() => feedbackEl.classList.remove('show'), 3000);
-      setTimeout(() => {
-        isRecording = false;
-        button.disabled = false;
-      }, 3000);
     });
   </script>
 </body>
