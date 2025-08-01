@@ -4,9 +4,9 @@
   "serialNumber": "123456789",
   "teamIdentifier": "FP27V8L4WY",
   "organizationName": "California St Dreaming",
-  "description": "Loyalty Pass",
-  "logoText": "CSD Loyalty",
+  "description": "CSD Card",
+  "logoText": "California St Dreaming",
   "foregroundColor": "rgb(255, 255, 255)",
-  "backgroundColor": "rgb(55, 117, 50)",
+  "backgroundColor": "rgb(39,59,226)",
   "storeCard" : {}
 }

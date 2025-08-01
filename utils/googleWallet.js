@@ -20,14 +20,6 @@ const walletClient = new GoogleAuth({
   scopes: 'https://www.googleapis.com/auth/wallet_object.issuer'
 });
 
-console.log("start");
-console.log(process.env.NODE_ENV);
-console.log(ENVIRONMENT);
-console.log(ENV_SUFFIX);
-console.log(classSuffix);
-console.log(classId);
-console.log("end");
-
 function getObjectInfo(email) {
   const objectSuffix = email.replace(/[^\w.-]/g, '_');
   const objectId = `${issuerId}.${classSuffix}.${objectSuffix}${postpend}`;
