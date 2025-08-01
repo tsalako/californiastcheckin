@@ -34,6 +34,20 @@ app.get('/healthz', (req, res) => {
   res.send('success');
 });
 
+// Ping /healthz every 14 minutes to prevent sleeping
+setInterval(() => {
+  const pstHour = new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles" });
+  const hour = new Date(pstHour).getHours();
+  if (hour >= 1 && hour < 9) {
+    console.log('[healthz] Skipped ping (quiet hours)');
+    return;
+  }
+
+  fetch('https://californiastcheckin.onrender.com/healthz')
+    .then(res => console.log(`[healthz] Ping success: ${res.status}`))
+    .catch(err => console.error('[healthz] Ping failed:', err));
+}, 14 * 60 * 1000); // 14 minutes
+
 app.get('/hasPass', async (req, res) => {
   const { email, idToken, platform } = req.query;
   try {
@@ -96,10 +110,3 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Server listening on port ${PORT}`);
 });
-
-// Ping /healthz every 14 minutes to prevent sleeping
-setInterval(() => {
-  fetch('https://californiastcheckin.onrender.com/healthz')
-    .then(res => console.log(`[healthz] Ping success: ${res.status}`))
-    .catch(err => console.error('[healthz] Ping failed:', err));
-}, 14 * 60 * 1000); // 14 minutes
