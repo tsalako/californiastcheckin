@@ -85,46 +85,11 @@ async function createApplePass(email, name, isUpdate = false) {
   const nowFormatted = formatInTimeZone(now, 'America/Los_Angeles', 'iii PP p');
   const nowMillis = now.getTime();
 
-  const visitField = metadata.auxiliaryFields?.find(f => f.key === 'visits');
-  const visitCount = (parseInt(visitField?.value || 0) + 1);
+  const visitTimestamps = Array.isArray(metadata.visitTimestamps) ? metadata.visitTimestamps : [];
+  visitTimestamps.push(nowMillis);
 
-  if (!isUpdate) {
-    metadata.serialNumber = objectSuffix;
-    // These fields are not actually set through "metadata" they are manually
-    // added to the pass after creation.
-    metadata.auxiliaryFields = [
-            { key: 'visits', label: 'Visits', value: `${visitCount}` },
-            { key: 'lastvisit', label: 'Last Visit', value: nowFormatted }
-        ];
-    metadata.backFields = [
-            { key: 'name_back', label: 'Dreamer Name', value: name },
-            { key: 'level_back', label: 'Level', value: 'Snoozer' },
-            { key: 'visits_back', label: 'Visits', value: `${visitCount}` },
-            { key: 'lastvisit_back', label: 'Last Visit', value: nowFormatted },
-            { key: 'lastvisittimestamp_back', label: 'LastVisitTimestamp', value: nowMillis.toString() }
-        ];
-  } else {
-  const lastVisitTimestampBackField = metadata.backFields?.find(f => f.key === 'lastvisittimestamp_back');
-  const lastVisitTime = parseInt(lastVisitTimestampBackField?.value || '0', 10);
-    
-  if (visitThrottleEnabled && !isNaN(lastVisitTime) && areSameDayPST(nowMillis, lastVisitTime)) {
-    console.log(`${name} attempted to check in more than once.`); 
-    throw new Error("You've already checked in today.");
-  }
-
-    if (visitField) visitField.value = visitCount;
-
-    const lastVisitField = metadata.auxiliaryFields?.find(f => f.key === 'lastvisit');
-    if (lastVisitField) lastVisitField.value = nowFormatted;
-
-    const visitBackField = metadata.backFields?.find(f => f.key === 'visits_back');
-    if (visitBackField) visitBackField.value = visitCount;
-
-    const lastVisitBackField = metadata.backFields?.find(f => f.key === 'lastvisit_back');
-    if (lastVisitBackField) lastVisitBackField.value = nowFormatted;
-
-    if (lastVisitTimestampBackField) lastVisitTimestampBackField.value = nowMillis.toString();
-  }
+   if (!isUpdate) metadata.serialNumber = objectSuffix;
+    metadata.visitTimestamps = visitTimestamps;
 
   const pass = await PKPass.from({
 		model: path.resolve(process.env.APPLE_TEMPLATE_PATH),
@@ -138,8 +103,18 @@ async function createApplePass(email, name, isUpdate = false) {
     metadata
     );
 
-    pass.auxiliaryFields.push.apply(pass.auxiliaryFields, metadata.auxiliaryFields);
-    pass.backFields.push.apply(pass.backFields, metadata.backFields);
+  pass.auxiliaryFields.push(
+    { key: 'visits', label: 'Visits', value: visitTimestamps.length.toString() },
+    { key: 'lastvisit', label: 'Last Visit', value: nowFormatted }
+  );
+  pass.backFields.push(
+    { key: 'name_back', label: 'Dreamer Name', value: name },
+    { key: 'level_back', label: 'Level', value: 'Snoozer' },
+    { key: 'visits_back', label: 'Visits', value: visitTimestamps.length.toString() },
+    { key: 'lastvisit_back', label: 'Last Visit', value: nowFormatted },
+    // probably dont need this field anymore.
+    { key: 'lastvisittimestamp_back', label: 'LastVisitTimestamp', value: nowMillis }
+  );
 
   const streamBuffer = pass.getAsStream();
 

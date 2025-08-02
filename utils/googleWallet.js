@@ -2,6 +2,7 @@
 const { GoogleAuth, OAuth2Client } = require('google-auth-library');
 const jwt = require('jsonwebtoken');
 const { formatInTimeZone } = require('date-fns-tz');
+const { Storage } = require('@google-cloud/storage');
 require('dotenv').config();
 
 const issuerId = process.env.GOOGLE_WALLET_ISSUER_ID;
@@ -21,22 +22,48 @@ const walletClient = new GoogleAuth({
   scopes: 'https://www.googleapis.com/auth/wallet_object.issuer'
 });
 
+const storage = new Storage({ credentials });
+const BUCKET_NAME = process.env.GCS_BUCKET_NAME;
+const metaDir = 'meta';
 const visitThrottleEnabled = isProduction;
 
 function getObjectInfo(email) {
-  const objectSuffix = email.replace(/[^\w.-]/g, '_');
+  const objectSuffix = email.replace(/[^\w-]/g, '_').replace(/\./g, '_');
   const objectId = `${issuerId}.${classSuffix}.${objectSuffix}${postpend}`;
-  return { objectSuffix, objectId };
+  return {
+    objectSuffix,
+    objectId,
+    metaFile: `${metaDir}/${objectSuffix}.json`
+  };
 }
 
-async function verifyToken(email, idToken) {
-  const ticket = await authClient.verifyIdToken({ idToken, audience });
-  const payload = ticket.getPayload();
-  if (payload.email !== email) throw new Error('Email mismatch');
+async function readJsonFromGCS(filename) {
+  const file = storage.bucket(BUCKET_NAME).file(filename);
+  const contents = await file.download();
+  return JSON.parse(contents.toString());
 }
 
-async function hasGooglePass(email, idToken) {
-//   await verifyToken(email, idToken);
+async function writeJsonToGCS(filename, data) {
+  const file = storage.bucket(BUCKET_NAME).file(filename);
+  await file.save(JSON.stringify(data), {
+    contentType: 'application/json',
+    resumable: false
+  });
+}
+
+function areSameDayPST(ms1, ms2) {
+  const date1 = new Date(ms1);
+  const date2 = new Date(ms2);
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    timeZone: 'America/Los_Angeles',
+  });
+  return formatter.format(date1) === formatter.format(date2);
+}
+
+async function hasGooglePass(email) {
   const { objectId } = getObjectInfo(email);
   try {
     await walletClient.request({
@@ -50,17 +77,28 @@ async function hasGooglePass(email, idToken) {
   }
 }
 
-async function createGooglePass(email, name, idToken) {
-//   await verifyToken(email, idToken);
-  const { objectId } = getObjectInfo(email);
+async function createGooglePass(email, name) {
+  const { objectId, metaFile } = getObjectInfo(email);
+  let metadata = {};
+  try {
+    metadata = await readJsonFromGCS(metaFile);
+  } catch (e) {
+    metadata = {};
+  }
 
   const now = new Date();
-  const nowFormatted = formatInTimeZone(now, 'America/Los_Angeles', 'iii PP p');
   const nowMillis = now.getTime();
+  const nowFormatted = formatInTimeZone(now, 'America/Los_Angeles', 'iii PP p');
+
+  const visitTimestamps = Array.isArray(metadata.visitTimestamps) ? metadata.visitTimestamps : [];
+  visitTimestamps.push(nowMillis);
+  metadata.visitTimestamps = visitTimestamps;
+
+  await writeJsonToGCS(metaFile, metadata);
 
   const loyaltyObject = {
     accountName: name,
-    loyaltyPoints: { label: 'Visits', balance: { int: 1 } },
+    loyaltyPoints: { label: 'Visits', balance: { int: visitTimestamps.length } },
     secondaryLoyaltyPoints: { label: 'Last Visit', balance: { string: nowFormatted } },
     id: objectId,
     classId,
@@ -84,65 +122,32 @@ async function createGooglePass(email, name, idToken) {
   return `https://pay.google.com/gp/v/save/${token}`;
 }
 
-function areSameDayPST(ms1, ms2) {
-  const date1 = new Date(ms1);
-  const date2 = new Date(ms2);
-
-  // Create DateTimeFormat objects for "America/Los_Angeles" (PST/PDT)
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    timeZone: 'America/Los_Angeles',
-  });
-
-  // Extract the formatted date strings for comparison
-  const formattedDate1 = formatter.format(date1);
-  const formattedDate2 = formatter.format(date2);
-
-  return formattedDate1 === formattedDate2;
-}
-
 async function updatePassObject(email, name) {
-  const { objectId } = getObjectInfo(email);
-
-  const getResponse = await walletClient.request({
-    url: `https://walletobjects.googleapis.com/walletobjects/v1/loyaltyObject/${objectId}`,
-    method: 'GET'
-  });
-
-  const lastVisitRow = getResponse.data.infoModuleData?.labelValueRows?.find(
-    row => row.columns?.[0]?.label === "LastVisitTimestamp"
-  );
+  const { objectId, metaFile } = getObjectInfo(email);
+  let metadata = await readJsonFromGCS(metaFile);
 
   const now = new Date();
-  const nowFormatted = formatInTimeZone(now, 'America/Los_Angeles', 'iii PP p');
   const nowMillis = now.getTime();
+  const nowFormatted = formatInTimeZone(now, 'America/Los_Angeles', 'iii PP p');
 
-  const lastVisitTime = parseInt(lastVisitRow?.columns?.[0]?.value || '0', 10);
+  const visitTimestamps = Array.isArray(metadata.visitTimestamps) ? metadata.visitTimestamps : [];
+  const lastTimestamp = visitTimestamps[visitTimestamps.length - 1] || 0;
 
-  if (visitThrottleEnabled && !isNaN(lastVisitTime) && areSameDayPST(nowMillis, lastVisitTime)) {
-    console.log(`${name} attempted to check in more than once.`);  
+  if (visitThrottleEnabled && !isNaN(lastTimestamp) && areSameDayPST(nowMillis, lastTimestamp)) {
+    console.log(`${name} attempted to check in more than once.`);
     throw new Error("You've already checked in today.");
   }
 
-  const currentPoints = getResponse.data.loyaltyPoints?.balance?.int || 0;
+  visitTimestamps.push(nowMillis);
+  metadata.visitTimestamps = visitTimestamps;
+  await writeJsonToGCS(metaFile, metadata);
 
   const patchBody = {
-    loyaltyPoints: { balance: { int: currentPoints + 1 } },
-    secondaryLoyaltyPoints: {
-      balance: { string: nowFormatted }
-    },
+    loyaltyPoints: { balance: { int: visitTimestamps.length } },
+    secondaryLoyaltyPoints: { balance: { string: nowFormatted } },
     infoModuleData: {
       labelValueRows: [
-        {
-          columns: [
-            {
-              label: "LastVisitTimestamp",
-              value: nowMillis.toString()
-            }
-          ]
-        }
+        { columns: [{ label: "LastVisitTimestamp", value: nowMillis.toString() }] }
       ]
     }
   };
@@ -161,12 +166,7 @@ async function createPassClass() {
       sourceUri: {
         uri: "https://i.pinimg.com/1200x/bd/b2/b1/bdb2b1d97a2d15377aea72591ad572be.jpg"
       },
-      contentDescription: {
-        defaultValue: {
-          language: "en-US",
-          value: "dreamy cloud"
-        }
-      }
+      contentDescription: { defaultValue: { language: "en-US", value: "dreamy cloud" } }
     },
     accountNameLabel: "Dreamer Name",
     rewardsTierLabel: "Level",
@@ -180,12 +180,7 @@ async function createPassClass() {
       sourceUri: {
         uri: "https://miro.medium.com/v2/resize:fit:1340/format:webp/1*0-TueDWgLOWDsa9U1pBsbw.jpeg"
       },
-      contentDescription: {
-        defaultValue: {
-          language: "en-US",
-          value: "HERO_IMAGE_DESCRIPTION"
-        }
-      }
+      contentDescription: { defaultValue: { language: "en-US", value: "HERO_IMAGE_DESCRIPTION" } }
     },
     enableSmartTap: true,
     hexBackgroundColor: "#050505",
@@ -216,5 +211,5 @@ module.exports = {
   hasGooglePass,
   createGooglePass,
   updatePassObject,
-  createPassClass,
+  createPassClass
 };
