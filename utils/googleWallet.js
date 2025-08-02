@@ -104,7 +104,7 @@ async function createGooglePass(email, name) {
     classId,
     state: 'ACTIVE',
     smartTapRedemptionValue: email,
-    textModulesData: [{ id: 'og_status', header: 'OG Status', body: '👑' }],
+    // textModulesData: [{ id: 'og_status', header: 'OG Status', body: '👑' }],
     infoModuleData: {
       labelValueRows: [{ columns: [{ label: 'LastVisitTimestamp', value: nowMillis.toString() }] }]
     },
@@ -172,7 +172,7 @@ async function createPassClass() {
     rewardsTierLabel: "Level",
     rewardsTier: "Snoozer",
     id: classId,
-    issuerName: "Tofe Salako",
+    issuerName: "CSD Pass",
     reviewStatus: "UNDER_REVIEW",
     redemptionIssuers: [issuerId],
     countryCode: "US",
