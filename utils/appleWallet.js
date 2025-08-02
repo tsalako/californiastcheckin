@@ -34,7 +34,9 @@ async function readJsonFromGCS(filename) {
   return JSON.parse(contents.toString());
 }
 
+let cachedCerts = null;
 async function getCertFiles() {
+  if (cachedCerts) return cachedCerts;
   const certFile = storage.bucket(BUCKET_NAME).file(`${certDir}/cert.pem`);
   const keyFile = storage.bucket(BUCKET_NAME).file(`${certDir}/key.pem`);
   const wwdrFile = storage.bucket(BUCKET_NAME).file(`${certDir}/AppleWWDR.pem`);
@@ -45,11 +47,12 @@ async function getCertFiles() {
     wwdrFile.download()
   ]);
 
-  return {
+  cachedCerts = {
     cert: cert.toString(),
     key: key.toString(),
     wwdr: wwdr.toString()
   };
+  return cachedCerts;
 }
 
 function areSameDayPST(ms1, ms2) {
