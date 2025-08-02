@@ -76,19 +76,15 @@ function areSameDayPST(ms1, ms2) {
 
 async function createApplePass(email, name, isUpdate = false) {
   console.log(`createApplePass - isUpdate: ${isUpdate}`);
-    console.time('certs'); 
-  const { cert, key, wwdr } = await getCertFiles();
-  console.timeEnd('certs');
+
   const { objectSuffix, passFile, metaFile } = getObjectInfo(email);
 
-  let metadata;
-  try {
-    console.time('readMetadata');
-    metadata = await readJsonFromGCS(metaFile);
-    console.timeEnd('readMetadata');
-  } catch (e) {
-    metadata = {};
-  }
+   console.time('certs and metadata');
+  const [{ cert, key, wwdr }, metadata] = await Promise.all([
+  getCertFiles(),
+  readJsonFromGCS(metaFile).catch(() => ({}))
+]);
+ console.timeEnd('certs and metadata');
 
   const now = new Date();
   const nowFormatted = formatInTimeZone(now, 'America/Los_Angeles', 'iii PP p');
@@ -141,23 +137,21 @@ console.time('generate pass');
     resumable: false
   });
 
-  console.time('write pass to GCS');
-  await new Promise((resolve, reject) => {
+  console.time('write pass and metadata to GCS');
+  await Promise.all([
+  new Promise((resolve, reject) => {
     streamBuffer.pipe(uploadStream)
       .on('error', reject)
       .on('finish', resolve);
-  });
-  console.timeEnd('write pass to GCS');
-
-  console.time('writeMetaFile');
-  await storage
-    .bucket(BUCKET_NAME)
+  }),
+  storage.bucket(BUCKET_NAME)
     .file(metaFile)
     .save(JSON.stringify(metadata), {
-        contentType: 'application/json',
-        resumable: false,
-    });
-    console.timeEnd('writeMetaFile');
+      contentType: 'application/json',
+      resumable: false,
+    })
+]);
+  console.timeEnd('write pass and metadata to GCS');
 
     console.time('getSignedUrl');
   const [url] = await file.getSignedUrl({
