@@ -113,7 +113,7 @@ body {
 .feedback {
   font-size: 0.95rem;
   font-weight: 500;
-  color: green;
+  color: red;
   opacity: 0;
   transition: opacity 0.3s ease;
 }

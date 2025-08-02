@@ -16,7 +16,7 @@ const passOutputDir = 'apple/passes';
 
 const ENVIRONMENT = process.env.NODE_ENV || 'development';
 const isProduction = ENVIRONMENT === 'production';
-const visitThrottleEnabled = isProduction
+const visitThrottleEnabled = isProduction;
 
 function getObjectInfo(email) {
   const objectSuffix = email.replace(/[^\w-]/g, '_').replace(/\./g, '_');
@@ -108,7 +108,8 @@ async function createApplePass(email, name, isUpdate = false) {
   const lastVisitTime = parseInt(lastVisitTimestampBackField?.value || '0', 10);
     
   if (visitThrottleEnabled && !isNaN(lastVisitTime) && areSameDayPST(nowMillis, lastVisitTime)) {
-     throw new Error("Already checked in today.");
+    console.log(`${name} attempted to check in more than once.`); 
+    throw new Error("You've already checked in today.");
   }
 
     if (visitField) visitField.value = visitCount;

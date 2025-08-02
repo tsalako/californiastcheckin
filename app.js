@@ -86,23 +86,14 @@ app.post('/record-visit', async (req, res) => {
       const { updatedPkpass, url } = await createApplePass(email, name, true);
       res.json({ url });
     } else {
-      try {
-        await updatePassObject(email);
+        await updatePassObject(email, name);
         res.status(200).json({ message: 'Visit recorded' });
         console.log(`${name} checked in.`);
-      } catch (err) {
-        if (err.statusCode === 429) {
-          res.status(429).json({ message: err.message, remainingSeconds: err.remainingSeconds });
-        } else {
-          console.error('Update error:', err);
-          res.status(500).json({ message: 'Failed to record visit' });
-        }
-      }
     }
   } catch (err) {
     console.error('record-visit error:', err);
     const code = err.statusCode || 500;
-    res.status(code).json({ message: err.message || 'Visit failed' });
+    res.status(code).json({ message: err.message || 'Failed to record visit' });
   }
 });
 

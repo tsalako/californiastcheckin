@@ -21,7 +21,7 @@ const walletClient = new GoogleAuth({
   scopes: 'https://www.googleapis.com/auth/wallet_object.issuer'
 });
 
-const visitThrottleEnabled = isProduction
+const visitThrottleEnabled = isProduction;
 
 function getObjectInfo(email) {
   const objectSuffix = email.replace(/[^\w.-]/g, '_');
@@ -103,7 +103,7 @@ function areSameDayPST(ms1, ms2) {
   return formattedDate1 === formattedDate2;
 }
 
-async function updatePassObject(email) {
+async function updatePassObject(email, name) {
   const { objectId } = getObjectInfo(email);
 
   const getResponse = await walletClient.request({
@@ -122,7 +122,8 @@ async function updatePassObject(email) {
   const lastVisitTime = parseInt(lastVisitRow?.columns?.[0]?.value || '0', 10);
 
   if (visitThrottleEnabled && !isNaN(lastVisitTime) && areSameDayPST(nowMillis, lastVisitTime)) {
-     throw new Error("Already checked in today.");
+    console.log(`${name} attempted to check in more than once.`);  
+    throw new Error("You've already checked in today.");
   }
 
   const currentPoints = getResponse.data.loyaltyPoints?.balance?.int || 0;
