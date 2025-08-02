@@ -14,7 +14,7 @@
       <div class="form-content">
         <!-- Identity -->
         <div class="stack-slot">
-          <div id="signinWrapper" class="slot-item visible">
+          <div id="signinWrapper" class="slot-item hidden">
             <div
               id="g_id_onload"
               data-client_id="<%= googleClientId %>"
@@ -63,6 +63,7 @@
       const platform = isApple ? "apple" : "google";
 
       const feedbackEl = document.getElementById("feedback");
+      const recordVisit = document.getElementById("recordVisit");
 
       function onSignIn(response) {
         idToken = response.credential;
@@ -70,9 +71,12 @@
         userEmail = payload.email;
         fullName = payload.name;
 
-        localStorage.setItem("userEmail", userEmail);
-        localStorage.setItem("idToken", idToken);
-        localStorage.setItem("name", fullName);
+        document.cookie = `userEmail=${userEmail}; path=/; max-age=${
+          60 * 60 * 24 * 366
+        }`;
+        document.cookie = `name=${fullName}; path=/; max-age=${
+          60 * 60 * 24 * 366
+        }`;
 
         document
           .getElementById("signinWrapper")
@@ -93,6 +97,7 @@
               document
                 .getElementById("recordWrapper")
                 .classList.replace("hidden", "visible");
+              recordVisit.click();
             } else {
               document
                 .getElementById("createWrapper")
@@ -101,40 +106,57 @@
           });
       }
 
-      // window.addEventListener('DOMContentLoaded', () => {
-      //     const email = localStorage.getItem('userEmail');
-      //     if (!email) {
-      //         document.getElementById('signinWrapper').classList.replace('hidden', 'visible');
-      //         return;
-      //     }
+      window.addEventListener("DOMContentLoaded", () => {
+        const signinWrapper = document.getElementById("signinWrapper");
+        signinWrapper.classList.replace("hidden", "visible");
+        const cookies = document.cookie.split("; ").reduce((acc, c) => {
+          const [k, v] = c.split("=");
+          acc[k] = decodeURIComponent(v);
+          return acc;
+        }, {});
 
-      //     const container = document.getElementById('button');
-      //     const idToken = ''; // not needed if bypassing identity
+        const email = cookies.userEmail;
+        const name = cookies.name;
+        if (!email) return;
 
-      //     fetch(`/hasPass?email=${encodeURIComponent(email)}&platform=${platform}`)
-      //         .then(res => res.json())
-      //         .then(({ exists }) => {
-      //         if (exists) {
-      //             document.getElementById('signinWrapper').classList.replace('visible', 'hidden');
-      //             document.getElementById('signedInWrapper').classList.replace('hidden', 'visible');
-      //             document.getElementById('signedInAs').textContent = localStorage.getItem('name') || `${email}`;
-      //             document.getElementById('recordWrapper').classList.replace('hidden', 'visible');
-      //         }
-      //         });
-      //     });
+        userEmail = email;
+        fullName = name;
+
+        document
+          .getElementById("signinWrapper")
+          .classList.replace("visible", "hidden");
+        document
+          .getElementById("signedInWrapper")
+          .classList.replace("hidden", "visible");
+        document.getElementById("signedInAs").textContent = name;
+
+        fetch(
+          `/hasPass?email=${encodeURIComponent(email)}&platform=${platform}`
+        )
+          .then((res) => res.json())
+          .then(({ exists }) => {
+            if (exists) {
+              document
+                .getElementById("recordWrapper")
+                .classList.replace("hidden", "visible");
+              recordVisit.click();
+            } else {
+              document
+                .getElementById("createWrapper")
+                .classList.replace("hidden", "visible");
+            }
+          });
+      });
 
       const createPassSubmit = document.getElementById("createPassSubmit");
-      createPassSubmit.disabled = false;
-      createPassSubmit.textContent = "Create Pass";
-
       createPassSubmit.addEventListener("click", async () => {
         createPassSubmit.disabled = true;
         createPassSubmit.textContent = "Creating...";
 
-        const email = localStorage.getItem("userEmail");
-        const name = localStorage.getItem("name");
-        const token = localStorage.getItem("idToken");
         const container = document.getElementById("button");
+        const email = userEmail;
+        const name = fullName;
+        const token = idToken;
 
         const res = await fetch(`/create-pass`, {
           method: "POST",
@@ -147,20 +169,14 @@
         if (res.ok) {
           const data = await res.json();
           createPassSubmit.textContent = "Created";
-          if (platform === "apple") {
-            const a = document.createElement("a");
-            a.href = data.url;
-            a.innerHTML =
-              '<img src="apple-wallet-button.svg" alt="Save to Apple Wallet" style="height: 50px; width: auto;">';
-            container.innerHTML = "";
-            container.appendChild(a);
-          } else {
-            const a = document.createElement("a");
-            a.href = data.button;
-            a.innerHTML = `<img src="google-wallet-button.png" alt="Save to Google Wallet">`;
-            container.innerHTML = "";
-            container.appendChild(a);
-          }
+          const a = document.createElement("a");
+          a.href = platform === "apple" ? data.url : data.button;
+          a.innerHTML =
+            platform === "apple"
+              ? '<img src="apple-wallet-button.svg" alt="Save to Apple Wallet" style="height: 50px; width: auto;">'
+              : '<img src="google-wallet-button.png" alt="Save to Google Wallet">';
+          container.innerHTML = "";
+          container.appendChild(a);
           container.classList.add("show");
         } else {
           const data = await res.json().catch(() => ({}));
@@ -171,24 +187,20 @@
         }
       });
 
-      const recordVisit = document.getElementById("recordVisit");
-      recordVisit.disabled = false;
-      recordVisit.textContent = "Record Visit";
-
       recordVisit.addEventListener("click", async () => {
         recordVisit.disabled = true;
         recordVisit.textContent = "Recording...";
 
-        const email = localStorage.getItem("userEmail");
-        const idToken = localStorage.getItem("idToken");
-        const name = localStorage.getItem("name");
+        const email = userEmail;
+        const token = idToken;
+        const name = fullName;
 
         const res = await fetch("/record-visit", {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: `name=${encodeURIComponent(name)}&email=${encodeURIComponent(
             email
-          )}&idToken=${encodeURIComponent(idToken)}&platform=${platform}`,
+          )}&idToken=${encodeURIComponent(token)}&platform=${platform}`,
         });
 
         if (res.ok) {
