@@ -50,6 +50,7 @@ setInterval(() => {
 
 app.get('/hasPass', async (req, res) => {
   const { email, idToken, platform } = req.query;
+   console.time('hasPass');
   try {
     const exists = platform === 'apple'
       ? await hasApplePass(email)
@@ -59,10 +60,12 @@ app.get('/hasPass', async (req, res) => {
     console.error('hasPass error:', err);
     res.status(500).json({ error: 'Server error' });
   }
+    console.timeEnd('hasPass');
 });
 
 app.post('/create-pass', async (req, res) => {
   const { email, name, idToken, platform } = req.body;
+  console.time('createPass');
   try {
     if (platform === 'apple') {
       const url = await createApplePass(email, name, false);
@@ -77,10 +80,12 @@ app.post('/create-pass', async (req, res) => {
     console.error('create-pass error:', err);
     res.status(500).json({ error: 'Failed to create pass' });
   }
+   console.timeEnd('createPass');
 });
 
 app.post('/record-visit', async (req, res) => {
   const { email, idToken, platform, name } = req.body;
+   console.time('recordVisit');
   try {
     if (platform === 'apple') {
       const url = await createApplePass(email, name, true);
@@ -95,6 +100,7 @@ app.post('/record-visit', async (req, res) => {
     const code = err.statusCode || 500;
     res.status(code).json({ message: err.message || 'Failed to record visit' });
   }
+   console.timeEnd('recordVisit');
 });
 
 const PORT = process.env.PORT || 3000;
