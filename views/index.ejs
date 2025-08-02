@@ -132,15 +132,13 @@
         if (platform === 'apple') {
           const a = document.createElement('a');
           a.href = data.url;
-          a.textContent = 'Download Pass';
-          a.className = 'button';
+          a.innerHTML = '<img src="apple-wallet-button.svg" alt="Save to Apple Wallet" style="height: 50px; width: auto;">';
           container.innerHTML = '';
           container.appendChild(a);
-          container.classList.add('show');
         } else {
           const a = document.createElement('a');
             a.href = data.button;
-            a.innerHTML = `<img src="wallet-button.png" alt="Save to Google Wallet">`;
+            a.innerHTML = `<img src="google-wallet-button.png" alt="Save to Google Wallet">`;
             container.innerHTML = '';
             container.appendChild(a);
         }
@@ -177,10 +175,9 @@
         const data = await res.json();
         if (platform === 'apple' && data.url) {
           const container = document.getElementById('button');
-          const a = document.createElement('a'); 
+             const a = document.createElement('a');
           a.href = data.url;
-          a.textContent = 'Download Updated Pass';
-          a.className = 'button';
+        a.innerHTML = '<img src="apple-wallet-button.svg" alt="Update Apple Wallet" style="height: 50px; width: auto;">';
           container.innerHTML = '';
           container.appendChild(a);
           container.classList.add('show');
