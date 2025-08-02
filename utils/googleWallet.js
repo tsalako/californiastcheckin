@@ -25,7 +25,7 @@ const walletClient = new GoogleAuth({
 const storage = new Storage({ credentials });
 const BUCKET_NAME = process.env.GCS_BUCKET_NAME;
 const metaDir = 'meta';
-const visitThrottleEnabled = isProduction;
+const visitThrottleEnabled = process.env.APPLE_THROTTLE_OVERRIDE === 'true' || isProduction;
 
 function getObjectInfo(email) {
   const objectSuffix = email.replace(/[^\w-]/g, '_').replace(/\./g, '_');
@@ -78,10 +78,13 @@ async function hasGooglePass(email) {
 }
 
 async function createGooglePass(email, name) {
+  console.log('createGooglePass');
   const { objectId, metaFile } = getObjectInfo(email);
   let metadata = {};
   try {
+      console.time('readMetaFile');
     metadata = await readJsonFromGCS(metaFile);
+    console.timeEnd('readMetaFile');
   } catch (e) {
     metadata = {};
   }
@@ -94,7 +97,9 @@ async function createGooglePass(email, name) {
   visitTimestamps.push(nowMillis);
   metadata.visitTimestamps = visitTimestamps;
 
+    console.time('writeMetaFile');
   await writeJsonToGCS(metaFile, metadata);
+  console.timeEnd('writeMetaFile');
 
   const loyaltyObject = {
     accountName: name,
@@ -105,9 +110,6 @@ async function createGooglePass(email, name) {
     state: 'ACTIVE',
     smartTapRedemptionValue: email,
     // textModulesData: [{ id: 'og_status', header: 'OG Status', body: '👑' }],
-    infoModuleData: {
-      labelValueRows: [{ columns: [{ label: 'LastVisitTimestamp', value: nowMillis.toString() }] }]
-    },
     passConstraints: { nfcConstraint: ['BLOCK_PAYMENT'] }
   };
 
@@ -118,13 +120,18 @@ async function createGooglePass(email, name) {
     payload: { loyaltyObjects: [loyaltyObject] }
   };
 
+  console.time('signPass');
   const token = jwt.sign(claims, credentials.private_key, { algorithm: 'RS256' });
+  console.timeEnd('signPass');
   return `https://pay.google.com/gp/v/save/${token}`;
 }
 
 async function updatePassObject(email, name) {
+    console.log('updatePassObject');
   const { objectId, metaFile } = getObjectInfo(email);
+    console.time('readMetaFile');
   let metadata = await readJsonFromGCS(metaFile);
+  console.timeEnd('readMetaFile');
 
   const now = new Date();
   const nowMillis = now.getTime();
@@ -140,23 +147,23 @@ async function updatePassObject(email, name) {
 
   visitTimestamps.push(nowMillis);
   metadata.visitTimestamps = visitTimestamps;
+
+    console.time('writeMetaFile');
   await writeJsonToGCS(metaFile, metadata);
+  console.timeEnd('writeMetaFile');
 
   const patchBody = {
     loyaltyPoints: { balance: { int: visitTimestamps.length } },
     secondaryLoyaltyPoints: { balance: { string: nowFormatted } },
-    infoModuleData: {
-      labelValueRows: [
-        { columns: [{ label: "LastVisitTimestamp", value: nowMillis.toString() }] }
-      ]
-    }
   };
 
+    console.time('patchPass');
   await walletClient.request({
     url: `https://walletobjects.googleapis.com/walletobjects/v1/loyaltyObject/${objectId}`,
     method: 'PATCH',
     data: patchBody
   });
+  console.timeEnd('patchPass');
 }
 
 async function createPassClass() {

@@ -65,7 +65,7 @@ app.post('/create-pass', async (req, res) => {
   const { email, name, idToken, platform } = req.body;
   try {
     if (platform === 'apple') {
-      const {pkpass, url } = await createApplePass(email, name, false);
+      const url = await createApplePass(email, name, false);
       res.json({ url });
     } else {
       await createPassClass();
@@ -83,13 +83,13 @@ app.post('/record-visit', async (req, res) => {
   const { email, idToken, platform, name } = req.body;
   try {
     if (platform === 'apple') {
-      const { updatedPkpass, url } = await createApplePass(email, name, true);
+      const url = await createApplePass(email, name, true);
       res.json({ url });
     } else {
         await updatePassObject(email, name);
-        res.status(200).json({ message: 'Visit recorded' });
-        console.log(`${name} checked in.`);
+        res.status(200).json({ message: 'Visit recorded' });  
     }
+    console.log(`${name} checked in.`);
   } catch (err) {
     console.error('record-visit error:', err);
     const code = err.statusCode || 500;

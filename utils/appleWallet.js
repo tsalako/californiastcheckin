@@ -16,7 +16,8 @@ const passOutputDir = 'apple/passes';
 
 const ENVIRONMENT = process.env.NODE_ENV || 'development';
 const isProduction = ENVIRONMENT === 'production';
-const visitThrottleEnabled = isProduction;
+const visitThrottleEnabled = process.env.APPLE_THROTTLE_OVERRIDE === 'true' || isProduction;
+
 
 function getObjectInfo(email) {
   const objectSuffix = email.replace(/[^\w-]/g, '_').replace(/\./g, '_');
@@ -71,12 +72,17 @@ function areSameDayPST(ms1, ms2) {
 }
 
 async function createApplePass(email, name, isUpdate = false) {
+  console.log(`createApplePass - isUpdate: ${isUpdate}`);
+    console.time('certs'); 
   const { cert, key, wwdr } = await getCertFiles();
+  console.timeEnd('certs');
   const { objectSuffix, passFile, metaFile } = getObjectInfo(email);
 
   let metadata;
   try {
+    console.time('readMetadata');
     metadata = await readJsonFromGCS(metaFile);
+    console.timeEnd('readMetadata');
   } catch (e) {
     metadata = {};
   }
@@ -86,11 +92,18 @@ async function createApplePass(email, name, isUpdate = false) {
   const nowMillis = now.getTime();
 
   const visitTimestamps = Array.isArray(metadata.visitTimestamps) ? metadata.visitTimestamps : [];
+  const lastTimestamp = visitTimestamps[visitTimestamps.length - 1] || 0;
+
+  if (visitThrottleEnabled && !isNaN(lastTimestamp) && areSameDayPST(nowMillis, lastTimestamp)) {
+    console.log(`${name} attempted to check in more than once.`);
+    throw new Error("You've already checked in today.");
+  }
   visitTimestamps.push(nowMillis);
 
    if (!isUpdate) metadata.serialNumber = objectSuffix;
     metadata.visitTimestamps = visitTimestamps;
 
+console.time('generate pass');
   const pass = await PKPass.from({
 		model: path.resolve(process.env.APPLE_TEMPLATE_PATH),
 		certificates: {
@@ -102,6 +115,7 @@ async function createApplePass(email, name, isUpdate = false) {
 	},
     metadata
     );
+    console.timeEnd('generate pass');
 
   pass.auxiliaryFields.push(
     { key: 'visits', label: 'Visits', value: visitTimestamps.length.toString() },
@@ -112,11 +126,11 @@ async function createApplePass(email, name, isUpdate = false) {
     { key: 'level_back', label: 'Level', value: 'Snoozer' },
     { key: 'visits_back', label: 'Visits', value: visitTimestamps.length.toString() },
     { key: 'lastvisit_back', label: 'Last Visit', value: nowFormatted },
-    // probably dont need this field anymore.
-    { key: 'lastvisittimestamp_back', label: 'LastVisitTimestamp', value: nowMillis }
   );
 
+      console.time('getAsStream');
   const streamBuffer = pass.getAsStream();
+      console.timeEnd('getAsStream');
 
   const file = storage.bucket(BUCKET_NAME).file(passFile);
   const uploadStream = file.createWriteStream({
@@ -124,12 +138,15 @@ async function createApplePass(email, name, isUpdate = false) {
     resumable: false
   });
 
+  console.time('write pass to GCS');
   await new Promise((resolve, reject) => {
     streamBuffer.pipe(uploadStream)
       .on('error', reject)
       .on('finish', resolve);
   });
+  console.timeEnd('write pass to GCS');
 
+  console.time('writeMetaFile');
   await storage
     .bucket(BUCKET_NAME)
     .file(metaFile)
@@ -137,17 +154,17 @@ async function createApplePass(email, name, isUpdate = false) {
         contentType: 'application/json',
         resumable: false,
     });
+    console.timeEnd('writeMetaFile');
 
+    console.time('getSignedUrl');
   const [url] = await file.getSignedUrl({
     action: 'read',
     expires: Date.now() + 5 * 60 * 1000,
     responseDisposition: 'attachment; filename="pass.pkpass"',
   });
+  console.timeEnd('getSignedUrl');
 
-  const [raw] = await file.download();
-  const base64 = raw.toString('base64');
-
-  return { pkpass: base64, url };
+  return url;
 }
 
 async function hasApplePass(email) {
