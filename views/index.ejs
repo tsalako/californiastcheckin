@@ -6,6 +6,11 @@
     <title>California St. Check-in</title>
     <link rel="stylesheet" href="/style.css" />
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script>
+      window.AUTO_PASS_CREATION = <%= autoPassCreation ? 'true' : 'false' %>;
+      window.AUTO_CLICK_CREATION_LINKS = <%= autoClickCreationLinks ? 'true' : 'false' %>;
+      window.AUTO_CLICK_RECORDING_LINKS = <%= autoClickRecordingLinks ? 'true' : 'false' %>;
+    </script>
   </head>
   <body>
     <div class="container">
@@ -64,6 +69,7 @@
 
       const feedbackEl = document.getElementById("feedback");
       const recordVisit = document.getElementById("recordVisit");
+      const createPassSubmit = document.getElementById("createPassSubmit");
 
       function onSignIn(response) {
         idToken = response.credential;
@@ -102,6 +108,7 @@
               document
                 .getElementById("createWrapper")
                 .classList.replace("hidden", "visible");
+                if (window.AUTO_PASS_CREATION) createPassSubmit.click();
             }
           });
       }
@@ -144,11 +151,11 @@
               document
                 .getElementById("createWrapper")
                 .classList.replace("hidden", "visible");
+                if (window.AUTO_PASS_CREATION) createPassSubmit.click();
             }
           });
       });
 
-      const createPassSubmit = document.getElementById("createPassSubmit");
       createPassSubmit.addEventListener("click", async () => {
         createPassSubmit.disabled = true;
         createPassSubmit.textContent = "Creating...";
@@ -171,13 +178,35 @@
           createPassSubmit.textContent = "Created";
           const a = document.createElement("a");
           a.href = platform === "apple" ? data.url : data.button;
-          a.innerHTML =
+
+          const img = new Image();
+          img.src =
             platform === "apple"
-              ? '<img src="apple-wallet-button.svg" alt="Save to Apple Wallet" style="height: 50px; width: auto;">'
-              : '<img src="google-wallet-button.png" alt="Save to Google Wallet">';
-          container.innerHTML = "";
-          container.appendChild(a);
-          container.classList.add("show");
+              ? "apple-wallet-button.svg"
+              : "google-wallet-button.png";
+          img.alt =
+            platform === "apple"
+              ? "Save to Apple Wallet"
+              : "Save to Google Wallet";
+          img.style.height = "50px";
+          img.style.width = "auto";
+
+          img.onload = () => {
+            a.appendChild(img);
+            container.innerHTML = "";
+            container.appendChild(a);
+            container.classList.add("show");
+            if (window.AUTO_CLICK_CREATION_LINKS) a.click();
+          };
+
+          img.onerror = () => {
+            a.textContent =
+              platform === "apple" ? "Download Pass" : "Save to Wallet";
+            container.innerHTML = "";
+            container.appendChild(a);
+            container.classList.add("show");
+            if (window.AUTO_CLICK_CREATION_LINKS) a.click();
+          };
         } else {
           const data = await res.json().catch(() => ({}));
           feedbackEl.textContent = data.message || "⚠️ Failed to create pass.";
@@ -210,11 +239,29 @@
             const container = document.getElementById("button");
             const a = document.createElement("a");
             a.href = data.url;
-            a.innerHTML =
-              '<img src="apple-wallet-button.svg" alt="Update Apple Wallet" style="height: 50px; width: auto;">';
-            container.innerHTML = "";
-            container.appendChild(a);
-            container.classList.add("show");
+
+            const img = new Image();
+            img.src = "apple-wallet-button.svg";
+            img.alt = "Update Apple Wallet";
+            img.style.height = "50px";
+            img.style.width = "auto";
+
+            img.onload = () => {
+              a.appendChild(img);
+              container.innerHTML = "";
+              container.appendChild(a);
+              container.classList.add("show");
+              if (window.AUTO_CLICK_RECORDING_LINKS) a.click();
+            };
+
+            img.onerror = () => {
+              console.warn("Failed to load Apple Wallet image.");
+              a.textContent = "Download Pass";
+              container.innerHTML = "";
+              container.appendChild(a);
+              container.classList.add("show");
+              if (window.AUTO_CLICK_RECORDING_LINKS) a.click(); // fallback in case image fails
+            };
           }
         } else {
           const data = await res.json().catch(() => ({}));

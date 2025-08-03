@@ -19,11 +19,13 @@ app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 app.use(express.static("public"));
 app.use(bodyParser.urlencoded({ extended: true }));
-// app.use(express.json());
 
 app.get("/", (req, res) => {
   res.render("index", {
     googleClientId: process.env.GCP_PROJECT_ID,
+    autoPassCreation: process.env.AUTO_PASS_CREATION === "true",
+    autoClickCreationLinks: process.env.AUTO_CLICK_CREATION_LINKS === "true",
+    autoClickRecordingLinks: process.env.AUTO_CLICK_RECORDING_LINKS === "true",
   });
 });
 
