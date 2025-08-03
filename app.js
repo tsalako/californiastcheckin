@@ -24,6 +24,7 @@ app.get("/", (req, res) => {
   res.render("index", {
     googleClientId: process.env.GCP_PROJECT_ID,
     autoPassCreation: process.env.AUTO_PASS_CREATION === "true",
+    autoVisitRecording: process.env.AUTO_VISIT_RECORDING === "true",
     autoClickCreationLinks: process.env.AUTO_CLICK_CREATION_LINKS === "true",
     autoClickRecordingLinks: process.env.AUTO_CLICK_RECORDING_LINKS === "true",
   });

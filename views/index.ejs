@@ -8,6 +8,7 @@
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script>
       window.AUTO_PASS_CREATION = <%= autoPassCreation ? 'true' : 'false' %>;
+      window.AUTO_VISIT_RECORDING = <%= autoVisitRecording ? 'true' : 'false' %>;
       window.AUTO_CLICK_CREATION_LINKS = <%= autoClickCreationLinks ? 'true' : 'false' %>;
       window.AUTO_CLICK_RECORDING_LINKS = <%= autoClickRecordingLinks ? 'true' : 'false' %>;
     </script>
@@ -118,13 +119,6 @@
       function handleSignedInState(email, name) {
         userEmail = email;
         fullName = name;
-        document
-          .getElementById("signinWrapper")
-          .classList.replace("visible", "hidden");
-        document
-          .getElementById("signedInWrapper")
-          .classList.replace("hidden", "visible");
-        document.getElementById("signedInAs").textContent = name;
 
         document.cookie = `userEmail=${encodeURIComponent(email)}; max-age=${
           60 * 60 * 24 * 366
@@ -132,6 +126,18 @@
         document.cookie = `name=${encodeURIComponent(name)}; max-age=${
           60 * 60 * 24 * 366
         }`;
+
+        hasPassCheck(email, name);
+      }
+
+      function hasPassCheck(email, name) {
+        document
+          .getElementById("signinWrapper")
+          .classList.replace("visible", "hidden");
+        document
+          .getElementById("signedInWrapper")
+          .classList.replace("hidden", "visible");
+        document.getElementById("signedInAs").textContent = name;
 
         fetch(
           `/hasPass?email=${encodeURIComponent(email)}&platform=${platform}`
@@ -142,17 +148,11 @@
               document
                 .getElementById("recordWrapper")
                 .classList.replace("hidden", "visible");
-              document
-                .getElementById("createWrapper")
-                .classList.replace("visible", "hidden");
-              recordVisit.click(); // maybe flag guard.
+              if (window.AUTO_VISIT_RECORDING) recordVisit.click();
             } else {
               document
                 .getElementById("createWrapper")
                 .classList.replace("hidden", "visible");
-              document
-                .getElementById("recordWrapper")
-                .classList.replace("visible", "hidden");
               if (window.AUTO_PASS_CREATION) createPassSubmit.click();
             }
           });
@@ -166,7 +166,6 @@
       document
         .getElementById("altSignInToggle")
         .addEventListener("click", () => {
-          console.log("altSignInToggle");
           document
             .getElementById("signinWrapper")
             .classList.replace("visible", "hidden");
@@ -176,7 +175,6 @@
         });
 
       document.getElementById("backToGoogle").addEventListener("click", () => {
-        console.log("backToGoogle");
         document
           .getElementById("manualSignInWrapper")
           .classList.replace("visible", "hidden");
@@ -188,7 +186,6 @@
       document
         .getElementById("manualSignInForm")
         .addEventListener("submit", (e) => {
-          console.log("manualSignInForm");
           e.preventDefault();
           const first = document.getElementById("firstName").value.trim();
           const last = document.getElementById("lastName").value.trim();
@@ -220,31 +217,7 @@
         userEmail = email;
         fullName = name;
 
-        document
-          .getElementById("signinWrapper")
-          .classList.replace("visible", "hidden");
-        document
-          .getElementById("signedInWrapper")
-          .classList.replace("hidden", "visible");
-        document.getElementById("signedInAs").textContent = name;
-
-        fetch(
-          `/hasPass?email=${encodeURIComponent(email)}&platform=${platform}`
-        )
-          .then((res) => res.json())
-          .then(({ exists }) => {
-            if (exists) {
-              document
-                .getElementById("recordWrapper")
-                .classList.replace("hidden", "visible");
-              recordVisit.click();
-            } else {
-              document
-                .getElementById("createWrapper")
-                .classList.replace("hidden", "visible");
-              if (window.AUTO_PASS_CREATION) createPassSubmit.click();
-            }
-          });
+        hasPassCheck(email, name);
       });
 
       createPassSubmit.addEventListener("click", async () => {
