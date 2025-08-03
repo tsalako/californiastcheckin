@@ -35,7 +35,47 @@
               data-shape="rectangular"
               data-logo_alignment="left"
             ></div>
+            <button id="altSignInToggle" class="text-link">
+              Sign in without Google
+            </button>
           </div>
+
+          <div id="manualSignInWrapper" class="slot-item hidden">
+            <div class="manual-signin-wrapper">
+              <form id="manualSignInForm" class="manual-signin-form">
+                <div class="form-row">
+                  <input
+                    type="text"
+                    id="firstName"
+                    name="firstName"
+                    placeholder="First Name"
+                    required
+                  />
+                  <input
+                    type="text"
+                    id="lastName"
+                    name="lastName"
+                    placeholder="Last Name"
+                    required
+                  />
+                </div>
+                <input
+                  type="email"
+                  id="emailManual"
+                  name="email"
+                  placeholder="Email"
+                  required
+                />
+                <button type="submit" class="button" id="manualSubmit">
+                  Continue
+                </button>
+              </form>
+              <button id="backToGoogle" class="text-link">
+                Back to Google Sign-in
+              </button>
+            </div>
+          </div>
+
           <div id="signedInWrapper" class="slot-item hidden">
             <p id="signedInAs" class="signed-in-as"></p>
           </div>
@@ -52,50 +92,49 @@
         </div>
 
         <!-- Feedback + Wallet -->
-        <div class="feedback-wallet-wrapper">
-          <div id="feedback" class="feedback" aria-live="polite"></div>
-          <div id="button" class="wallet-button-wrapper"></div>
+        <div class="stack-slot">
+          <div class="slot-item visible">
+            <div class="feedback-wallet-wrapper">
+              <div id="feedback" class="feedback" aria-live="polite"></div>
+              <div id="button" class="wallet-button-wrapper"></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
     <script>
-      let idToken = "",
-        userEmail = "",
+      let userEmail = "",
         fullName = "";
       let isRecording = false;
       const isApple = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+      // const isApple = true;
       const platform = isApple ? "apple" : "google";
 
       const feedbackEl = document.getElementById("feedback");
       const recordVisit = document.getElementById("recordVisit");
       const createPassSubmit = document.getElementById("createPassSubmit");
 
-      function onSignIn(response) {
-        idToken = response.credential;
-        const payload = JSON.parse(atob(idToken.split(".")[1]));
-        userEmail = payload.email;
-        fullName = payload.name;
-
-        document.cookie = `userEmail=${userEmail}; path=/; max-age=${
-          60 * 60 * 24 * 366
-        }`;
-        document.cookie = `name=${fullName}; path=/; max-age=${
-          60 * 60 * 24 * 366
-        }`;
-
+      function handleSignedInState(email, name) {
+        userEmail = email;
+        fullName = name;
         document
           .getElementById("signinWrapper")
           .classList.replace("visible", "hidden");
         document
           .getElementById("signedInWrapper")
           .classList.replace("hidden", "visible");
-        document.getElementById("signedInAs").textContent = `${fullName}`;
+        document.getElementById("signedInAs").textContent = name;
+
+        document.cookie = `userEmail=${encodeURIComponent(email)}; max-age=${
+          60 * 60 * 24 * 366
+        }`;
+        document.cookie = `name=${encodeURIComponent(name)}; max-age=${
+          60 * 60 * 24 * 366
+        }`;
 
         fetch(
-          `/hasPass?email=${encodeURIComponent(
-            userEmail
-          )}&idToken=${encodeURIComponent(idToken)}&platform=${platform}`
+          `/hasPass?email=${encodeURIComponent(email)}&platform=${platform}`
         )
           .then((res) => res.json())
           .then(({ exists }) => {
@@ -103,19 +142,71 @@
               document
                 .getElementById("recordWrapper")
                 .classList.replace("hidden", "visible");
-              recordVisit.click();
+              document
+                .getElementById("createWrapper")
+                .classList.replace("visible", "hidden");
+              recordVisit.click(); // maybe flag guard.
             } else {
               document
                 .getElementById("createWrapper")
                 .classList.replace("hidden", "visible");
+              document
+                .getElementById("recordWrapper")
+                .classList.replace("visible", "hidden");
               if (window.AUTO_PASS_CREATION) createPassSubmit.click();
             }
           });
       }
 
+      function onSignIn(response) {
+        const payload = JSON.parse(atob(response.credential.split(".")[1]));
+        handleSignedInState(payload.email, payload.name);
+      }
+
+      document
+        .getElementById("altSignInToggle")
+        .addEventListener("click", () => {
+          console.log("altSignInToggle");
+          document
+            .getElementById("signinWrapper")
+            .classList.replace("visible", "hidden");
+          document
+            .getElementById("manualSignInWrapper")
+            .classList.replace("hidden", "visible");
+        });
+
+      document.getElementById("backToGoogle").addEventListener("click", () => {
+        console.log("backToGoogle");
+        document
+          .getElementById("manualSignInWrapper")
+          .classList.replace("visible", "hidden");
+        document
+          .getElementById("signinWrapper")
+          .classList.replace("hidden", "visible");
+      });
+
+      document
+        .getElementById("manualSignInForm")
+        .addEventListener("submit", (e) => {
+          console.log("manualSignInForm");
+          e.preventDefault();
+          const first = document.getElementById("firstName").value.trim();
+          const last = document.getElementById("lastName").value.trim();
+          const email = document.getElementById("emailManual").value.trim();
+          if (!first || !last || !email) return;
+          document
+            .getElementById("manualSignInWrapper")
+            .classList.replace("visible", "hidden");
+          const name = `${first} ${last}`;
+          handleSignedInState(email, name);
+        });
+
       window.addEventListener("DOMContentLoaded", () => {
         const signinWrapper = document.getElementById("signinWrapper");
         signinWrapper.classList.replace("hidden", "visible");
+        if (!isApple) {
+          document.getElementById("altSignInToggle").style.display = "none";
+        }
         const cookies = document.cookie.split("; ").reduce((acc, c) => {
           const [k, v] = c.split("=");
           acc[k] = decodeURIComponent(v);
@@ -163,14 +254,13 @@
         const container = document.getElementById("button");
         const email = userEmail;
         const name = fullName;
-        const token = idToken;
 
         const res = await fetch(`/create-pass`, {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: `name=${encodeURIComponent(name)}&email=${encodeURIComponent(
             email
-          )}&idToken=${encodeURIComponent(token)}&platform=${platform}`,
+          )}&platform=${platform}`,
         });
 
         if (res.ok) {
@@ -221,7 +311,6 @@
         recordVisit.textContent = "Recording...";
 
         const email = userEmail;
-        const token = idToken;
         const name = fullName;
 
         const res = await fetch("/record-visit", {
@@ -229,7 +318,7 @@
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: `name=${encodeURIComponent(name)}&email=${encodeURIComponent(
             email
-          )}&idToken=${encodeURIComponent(token)}&platform=${platform}`,
+          )}&platform=${platform}`,
         });
 
         if (res.ok) {

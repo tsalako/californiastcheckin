@@ -42,7 +42,7 @@ body {
   position: relative;
   width: 100%;
   max-width: 320px;
-  min-height: 52px;
+  min-height: 52px; /* may need to change if "email" input doesnt work */
 }
 
 .slot-item {
@@ -156,4 +156,90 @@ body {
 button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.wallet-button-wrapper:not(.show),
+.feedback:not(.show) {
+  display: none;
+}
+
+.form-row {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 320px;
+}
+
+.manual-signin-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* centers the button horizontally */
+  gap: 0.5rem;
+}
+
+.manual-signin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 320px;
+  align-items: center;
+}
+
+.manual-signin-form .form-row {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.manual-signin-form .form-row input[type="text"] {
+  width: calc(50% - 0.25rem);
+}
+
+.manual-signin-form input[type="text"],
+.manual-signin-form input[type="email"] {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 1rem;
+}
+
+.manual-signin-form input[type="email"] {
+  width: 100%;
+}
+
+.manual-signin-form button {
+  flex: 1;
+}
+
+.manual-signin-form input:focus {
+  outline: none;
+  border-color: #4285f4;
+  box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2);
+}
+
+.text-link {
+  background: none;
+  border: none;
+  color: #4285f4;
+  font-size: 0.95rem;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0.5rem 1rem;
+}
+
+.text-link:hover {
+  color: #3367d6;
+}
+
+#signinWrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem; /* adds spacing between elements */
+}
+
+#altSignInToggle, #backToGoogle {
+  z-index: 2;
+  position: relative; /* required for z-index to apply */
 }

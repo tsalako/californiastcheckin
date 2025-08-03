@@ -50,13 +50,13 @@ setInterval(() => {
 }, 14 * 60 * 1000); // 14 minutes
 
 app.get("/hasPass", async (req, res) => {
-  const { email, idToken, platform } = req.query;
+  const { email, platform } = req.query;
   console.time("hasPass");
   try {
     const exists =
       platform === "apple"
         ? await hasApplePass(email)
-        : await hasGooglePass(email, idToken);
+        : await hasGooglePass(email);
     res.json({ exists });
   } catch (err) {
     console.error("hasPass error:", err);
@@ -66,7 +66,7 @@ app.get("/hasPass", async (req, res) => {
 });
 
 app.post("/create-pass", async (req, res) => {
-  const { email, name, idToken, platform } = req.body;
+  const { email, name, platform } = req.body;
   console.time("createPass");
   try {
     if (platform === "apple") {
@@ -74,7 +74,7 @@ app.post("/create-pass", async (req, res) => {
       res.json({ url });
     } else {
       await createPassClass();
-      const button = await createGooglePass(email, name, idToken);
+      const button = await createGooglePass(email, name);
       res.json({ button });
     }
     console.log(`${name} created a pass and checked in.`);
@@ -86,7 +86,7 @@ app.post("/create-pass", async (req, res) => {
 });
 
 app.post("/record-visit", async (req, res) => {
-  const { email, idToken, platform, name } = req.body;
+  const { email, platform, name } = req.body;
   console.time("recordVisit");
   try {
     if (platform === "apple") {
