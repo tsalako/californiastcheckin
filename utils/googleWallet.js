@@ -102,6 +102,7 @@ async function createGooglePass(email, name) {
   metadata.name = name;
   metadata.email = email;
 
+  // TODO: write to updates
   console.time("writeMetaFile");
   await writeJsonToGCS(metaFile, metadata);
   console.timeEnd("writeMetaFile");
@@ -169,6 +170,7 @@ async function updatePassObject(email, name) {
   if (!metadata.name) metadata.name = name;
   if (!metadata.email) metadata.email = email;
 
+  // TODO: write to updates
   console.time("writeMetaFile");
   await writeJsonToGCS(metaFile, metadata);
   console.timeEnd("writeMetaFile");
@@ -188,6 +190,7 @@ async function updatePassObject(email, name) {
 }
 
 async function createPassClass() {
+  // TODO: get images from GCS instead of random sites.
   const loyaltyClass = {
     programName: "California St Dreaming",
     programLogo: {

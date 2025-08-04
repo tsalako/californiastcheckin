@@ -97,6 +97,7 @@ async function createApplePass(email, name, isUpdate = false) {
   console.time("certs and metadata");
   const [{ cert, key, wwdr }, updates, metadata] = await Promise.all([
     getCertFiles(),
+    // TODO: maybe have updates file be a list instead of an object
     readJsonFromGCS(updatesFile).catch(() => ({})),
     readJsonFromGCS(metaFile).catch(() => ({})),
   ]);
