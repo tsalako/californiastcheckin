@@ -4,6 +4,8 @@ const fs = require("fs/promises");
 const path = require("path");
 const { PKPass } = require("passkit-generator");
 const { formatInTimeZone } = require("date-fns-tz");
+const crypto = require("crypto");
+const apn = require("apn");
 require("dotenv").config();
 
 const BUCKET_NAME = process.env.GCS_BUCKET_NAME;
@@ -19,12 +21,21 @@ const isProduction = ENVIRONMENT === "production";
 const visitThrottleEnabled =
   process.env.APPLE_THROTTLE_OVERRIDE === "true" || isProduction;
 
+function generateAuthToken() {
+  return crypto.randomBytes(16).toString("hex"); // 32-char token
+}
+
 function getObjectInfo(email) {
-  const objectSuffix = email.replace(/[^\w-]/g, "_").replace(/\./g, "_");
+  const serialNumber = email.replace(/[^\w-]/g, "_").replace(/\./g, "_");
+  return getObjectInfoFromSN(serialNumber);
+}
+
+function getObjectInfoFromSN(serialNumber) {
   return {
-    objectSuffix,
-    passFile: `${passOutputDir}/${objectSuffix}.pkpass`,
-    metaFile: `${metaDir}/${objectSuffix}.json`,
+    serialNumber,
+    passFile: `${passOutputDir}/${serialNumber}.pkpass`,
+    metaFile: `${metaDir}/${serialNumber}.json`,
+    updatesFile: `${certDir}/updates.json`,
   };
 }
 
@@ -40,17 +51,20 @@ async function getCertFiles() {
   const certFile = storage.bucket(BUCKET_NAME).file(`${certDir}/cert.pem`);
   const keyFile = storage.bucket(BUCKET_NAME).file(`${certDir}/key.pem`);
   const wwdrFile = storage.bucket(BUCKET_NAME).file(`${certDir}/AppleWWDR.pem`);
+  const authKeyFile = storage.bucket(BUCKET_NAME).file(`${certDir}/AuthKey.p8`);
 
-  const [cert, key, wwdr] = await Promise.all([
+  const [cert, key, wwdr, authKey] = await Promise.all([
     certFile.download(),
     keyFile.download(),
     wwdrFile.download(),
+    authKeyFile.download(),
   ]);
 
   cachedCerts = {
     cert: cert.toString(),
     key: key.toString(),
     wwdr: wwdr.toString(),
+    authKey: authKey.toString(),
   };
   return cachedCerts;
 }
@@ -77,11 +91,13 @@ function areSameDayPST(ms1, ms2) {
 async function createApplePass(email, name, isUpdate = false) {
   console.log(`createApplePass - isUpdate: ${isUpdate}`);
 
-  const { objectSuffix, passFile, metaFile } = getObjectInfo(email);
+  const { serialNumber, passFile, metaFile, updatesFile } =
+    getObjectInfo(email);
 
   console.time("certs and metadata");
-  const [{ cert, key, wwdr }, metadata] = await Promise.all([
+  const [{ cert, key, wwdr }, updates, metadata] = await Promise.all([
     getCertFiles(),
+    readJsonFromGCS(updatesFile).catch(() => ({})),
     readJsonFromGCS(metaFile).catch(() => ({})),
   ]);
   console.timeEnd("certs and metadata");
@@ -105,8 +121,28 @@ async function createApplePass(email, name, isUpdate = false) {
   }
   visitTimestamps.push(nowMillis);
 
-  if (!isUpdate) metadata.serialNumber = objectSuffix;
   metadata.visitTimestamps = visitTimestamps;
+  if (!isUpdate) {
+    metadata.serialNumber = serialNumber;
+    metadata.authenticationToken = generateAuthToken();
+    metadata.passTypeIdentifier = process.env.APPLE_PASS_TYPE_IDENTIFIER;
+    metadata.teamIdentifier = process.env.APPLE_TEAM_ID;
+  } else if (!metadata.authenticationToken) {
+    // To help with existing passes that were made before push notifications were created.
+    metadata.authenticationToken = generateAuthToken();
+    metadata.passTypeIdentifier = process.env.APPLE_PASS_TYPE_IDENTIFIER;
+    metadata.teamIdentifier = process.env.APPLE_TEAM_ID;
+  }
+
+  if (!updates.updates) updates.updates = [];
+  const entry = {};
+  entry.serialNumber = serialNumber;
+  entry.updateTime = nowMillis;
+  entry.isUpdate = isUpdate;
+  entry.devices = metadata.devices || []; // may not work depending on when the device is registered.
+  updates.updates.push(entry);
+
+  const hasRegisteredDevice = metadata.devices != null;
 
   console.time("generate pass");
   const pass = await PKPass.from(
@@ -152,7 +188,7 @@ async function createApplePass(email, name, isUpdate = false) {
     resumable: false,
   });
 
-  console.time("write pass and metadata to GCS");
+  console.time("write pass, metadata, and updates to GCS");
   await Promise.all([
     new Promise((resolve, reject) => {
       streamBuffer.pipe(uploadStream).on("error", reject).on("finish", resolve);
@@ -161,8 +197,15 @@ async function createApplePass(email, name, isUpdate = false) {
       contentType: "application/json",
       resumable: false,
     }),
+    storage
+      .bucket(BUCKET_NAME)
+      .file(updatesFile)
+      .save(JSON.stringify(updates), {
+        contentType: "application/json",
+        resumable: false,
+      }),
   ]);
-  console.timeEnd("write pass and metadata to GCS");
+  console.timeEnd("write pass, metadata, and updates to GCS");
 
   console.time("getSignedUrl");
   const [url] = await file.getSignedUrl({
@@ -172,7 +215,7 @@ async function createApplePass(email, name, isUpdate = false) {
   });
   console.timeEnd("getSignedUrl");
 
-  return url;
+  return { url, hasRegisteredDevice };
 }
 
 async function hasApplePass(email) {
@@ -181,4 +224,167 @@ async function hasApplePass(email) {
   return exists;
 }
 
-module.exports = { createApplePass, hasApplePass };
+async function registerDevice(
+  serialNumber,
+  deviceLibraryIdentifier,
+  pushToken
+) {
+  console.log("registerDevice");
+  const { metaFile } = getObjectInfoFromSN(serialNumber);
+
+  console.time("metadata");
+  const metadata = await readJsonFromGCS(metaFile).catch(() => ({}));
+  console.timeEnd("metadata");
+
+  if (!metadata.devices) metadata.devices = [];
+
+  const alreadyRegistered = metadata.devices.some(
+    (d) => d.deviceLibraryIdentifier === deviceLibraryIdentifier
+  );
+
+  if (alreadyRegistered) {
+    return false;
+  }
+  metadata.devices.push({ deviceLibraryIdentifier, pushToken });
+
+  console.time("write metadata to GCS");
+  await storage
+    .bucket(BUCKET_NAME)
+    .file(metaFile)
+    .save(JSON.stringify(metadata), {
+      contentType: "application/json",
+      resumable: false,
+    });
+  console.timeEnd("write metadata to GCS");
+  return true;
+}
+
+async function getUpdatedSerialNumbers(deviceLibraryIdentifier, updatedSince) {
+  console.log("getUpdatedSerialNumbers");
+  const { updatesFile } = getObjectInfoFromSN(serialNumber);
+
+  console.time("updates");
+  const updates = await readJsonFromGCS(updatesFile).catch(() => ({}));
+  console.timeEnd("updates");
+
+  const updateSinceTime = new Date(parseInt(updatedSince, 10) || 0);
+    console.time("filter");
+  const updatesSince = updates.filter(
+    (e) =>
+      e.isUpdate &&
+      new Date(e.updateTime) > updateSinceTime &&
+      e.devices.some(
+        (d) => d.deviceLibraryIdentifier === deviceLibraryIdentifier
+      )
+  );
+    console.timeEnd("filter");
+  if (updateSince.length == 0) throw new Error("nothing found");
+
+  const serials = updatesSince.map((e) => e.serialNumber);
+  const lastUpdate = updatesSince[updatesSince.length - 1].nowMillis.toString();
+
+  return {
+    serialNumbers: serials,
+    lastUpdated: lastUpdate,
+  };
+}
+
+async function unregisterDevice(serialNumber, deviceLibraryIdentifier) {
+  console.log("unregisterDevice");
+  const { metaFile } = getObjectInfoFromSN(serialNumber);
+
+  console.time("metadata");
+  const metadata = await readJsonFromGCS(metaFile).catch(() => ({}));
+  console.timeEnd("metadata");
+
+  if (!metadata.devices) return;
+
+  metadata.devices = metadata.devices.filter(
+    (d) => d.deviceLibraryIdentifier !== deviceLibraryIdentifier
+  );
+
+  console.time("write metadata to GCS");
+  await storage
+    .bucket(BUCKET_NAME)
+    .file(metaFile)
+    .save(JSON.stringify(metadata), {
+      contentType: "application/json",
+      resumable: false,
+    });
+  console.timeEnd("write metadata to GCS");
+}
+
+async function getUpdatedPass(serialNumber, authHeader) {
+   console.log("getUpdatedPass");
+  const { passFile, metaFile } = getObjectInfoFromSN(serialNumber);
+
+  console.time("pass and metadata");
+  const [pass, metadata] = await Promise.all([
+    storage
+      .bucket(BUCKET_NAME)
+      .file(passFile)
+      .download()
+      .catch(() => null),
+    readJsonFromGCS(metaFile).catch(() => ({})),
+  ]);
+  console.timeEnd("pass and metadata");
+
+  if (!pass) throw new Error("No updated pass found.");
+
+  if (
+    !metadata ||
+    !metadata.authenticationToken ||
+    authHeader !== `ApplePass ${metadata.authenticationToken}`
+  ) {
+    throw new Error("No authentication.");
+  }
+
+  return pass;
+}
+
+async function sendPushUpdateByEmail(email) {
+  console.log("sendPushUpdateByEmail");
+  const { metaFile } = getObjectInfo(email);
+
+  console.time("metadata");
+  const metadata = await readJsonFromGCS(metaFile).catch(() => ({}));
+  console.timeEnd("metadata");
+  const devices = metadata.devices;
+
+  if (!devices || devices.length === 0)
+    throw new Error("No registered devices");
+
+  const { authKey } = getCertFiles();
+  const provider = new apn.Provider({
+    token: {
+      key: authKey,
+      keyId: process.env.APPLE_KEY_ID,
+      teamId: process.env.APPLE_TEAM_ID,
+    },
+    production: true,
+  });
+
+  const note = new apn.Notification();
+  note.pushType = "background";
+  note.topic = process.env.APPLE_PASS_TYPE_IDENTIFIER;
+  note.expiry = Math.floor(Date.now() / 1000) + 3600;
+
+  const results = [];
+  for (const { pushToken } of devices) {
+    const result = await provider.send(note, pushToken);
+    results.push(result);
+  }
+
+  provider.shutdown();
+  return results;
+}
+
+module.exports = {
+  createApplePass,
+  hasApplePass,
+  registerDevice,
+  getUpdatedSerialNumbers,
+  unregisterDevice,
+  getUpdatedPass,
+  sendPushUpdateByEmail,
+};

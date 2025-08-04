@@ -1,12 +1,15 @@
 {
   "formatVersion": 1,
-  "passTypeIdentifier": "pass.com.app.californiastcheckin",
+  "passTypeIdentifier": "com.app.placeholder",
+  "authenticationToken": "123456789123456789",
+  "webServiceURL": "https://californiastcheckin.onrender.com/",
   "serialNumber": "123456789",
-  "teamIdentifier": "FP27V8L4WY",
+  "teamIdentifier": "ABCD1234",
   "organizationName": "California St Dreaming",
   "description": "CSD Pass",
   "logoText": "California St Dreaming",
   "foregroundColor": "rgb(255, 255, 255)",
-  "backgroundColor": "rgb(39,59,226)",
+  "labelColor": "rgb(255, 255, 255)",
+  "backgroundColor": "rgb(0,0,0)",
   "storeCard" : {}
 }

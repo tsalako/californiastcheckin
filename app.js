@@ -11,7 +11,15 @@ const {
   createPassClass,
 } = require("./utils/googleWallet");
 
-const { hasApplePass, createApplePass } = require("./utils/appleWallet");
+const {
+  hasApplePass,
+  createApplePass,
+  registerDevice,
+  getUpdatedSerialNumbers,
+  unregisterDevice,
+  getUpdatedPass,
+  sendPushUpdateByEmail,
+} = require("./utils/appleWallet");
 
 const app = express();
 
@@ -91,8 +99,12 @@ app.post("/record-visit", async (req, res) => {
   console.time("recordVisit");
   try {
     if (platform === "apple") {
-      const url = await createApplePass(email, name, true);
-      res.json({ url });
+      const { url, hasRegisteredDevice } = await createApplePass(
+        email,
+        name,
+        true
+      );
+      res.json({ url, hasRegisteredDevice });
     } else {
       await updatePassObject(email, name);
       res.status(200).json({ message: "Visit recorded" });
@@ -104,6 +116,95 @@ app.post("/record-visit", async (req, res) => {
     res.status(code).json({ message: err.message || "Failed to record visit" });
   }
   console.timeEnd("recordVisit");
+});
+
+// Register device
+app.post(
+  "/v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier/:serialNumber",
+  async (req, res) => {
+    console.time("registerDevice");
+    const { deviceLibraryIdentifier, serialNumber } = req.params;
+    const pushToken = req.body.pushToken;
+    const newlyRegistered = await registerDevice(
+      serialNumber,
+      deviceLibraryIdentifier,
+      pushToken
+    );
+    const status = newlyRegistered ? 201 : 200;
+    res.status(status).send();
+    console.timeEnd("registerDevice");
+  }
+);
+
+// Get updates since timestamp (Apple calls this to get serials to update)
+app.get(
+  "/v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier",
+  async (req, res) => {
+    console.time("updatesSinceTime");
+    const { deviceLibraryIdentifier, passTypeIdentifier } = req.params;
+    const updatedSince = req.query.passesUpdatedSince;
+
+    try {
+      const { serialNumbers, lastUpdated } = await getUpdatedSerialNumbers(
+        deviceLibraryIdentifier,
+        updatedSince
+      );
+      res.status(200).json({ serialNumbers, lastUpdated });
+    } catch (err) {
+      if (err.message === "nothing found") {
+        res.status(204).send();
+      } else {
+        console.error("Get updated passes error:", err);
+        res.status(500).send("Internal Server Error");
+      }
+    }
+    console.timeEnd("updatesSinceTime");
+  }
+);
+
+// Unregister
+app.delete(
+  "/v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier/:serialNumber",
+  async (req, res) => {
+    console.time("unregisterDevice");
+    const { deviceLibraryIdentifier, serialNumber } = req.params;
+    await unregisterDevice(serialNumber, deviceLibraryIdentifier);
+    res.status(200).send();
+    console.timeEnd("unregisterDevice");
+  }
+);
+
+// Pass update request handler (Apple may call this)
+app.get("/v1/passes/:passTypeIdentifier/:serialNumber", async (req, res) => {
+  // Return updated pass.json or 304
+  console.time("getUpdatedPass");
+  const { passTypeIdentifier, serialNumber } = req.params;
+  const authHeader = req.headers.authorization;
+  try {
+    const pass = await getUpdatedPass(serialNumber, authHeader);
+    res.set({
+      "Content-Type": "application/vnd.apple.pkpass",
+      "Content-Disposition": "attachment; filename=pass.pkpass",
+    });
+    res.status(200).send(pass);
+  } catch (err) {
+    console.error("Error in /v1/passes:", err);
+    res.status(500).send("Internal Server Error");
+  }
+  console.timeEnd("getUpdatedPass");
+});
+
+// Push Trigger Route
+app.get("/push-update", async (req, res) => {
+  console.time("pushUpdate");
+  try {
+    const { email } = req.query;
+    await sendPushUpdateByEmail(email);
+    res.send("Push sent");
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+  console.timeEnd("pushUpdate");
 });
 
 const PORT = process.env.PORT || 3000;

@@ -297,33 +297,37 @@
         if (res.ok) {
           recordVisit.textContent = "Recorded!";
           const data = await res.json();
-          if (platform === "apple" && data.url) {
-            const container = document.getElementById("button");
-            const a = document.createElement("a");
-            a.href = data.url;
+          if (platform === "apple") {
+            if (data.hasRegisteredDevice) {
+              await fetch(`/push-update?email=${encodeURIComponent(email)}`);
+            } else if (data.url) {
+              const container = document.getElementById("button");
+              const a = document.createElement("a");
+              a.href = data.url;
 
-            const img = new Image();
-            img.src = "apple-wallet-button.svg";
-            img.alt = "Update Apple Wallet";
-            img.style.height = "50px";
-            img.style.width = "auto";
+              const img = new Image();
+              img.src = "apple-wallet-button.svg";
+              img.alt = "Update Apple Wallet";
+              img.style.height = "50px";
+              img.style.width = "auto";
 
-            img.onload = () => {
-              a.appendChild(img);
-              container.innerHTML = "";
-              container.appendChild(a);
-              container.classList.add("show");
-              if (window.AUTO_CLICK_RECORDING_LINKS) a.click();
-            };
+              img.onload = () => {
+                a.appendChild(img);
+                container.innerHTML = "";
+                container.appendChild(a);
+                container.classList.add("show");
+                if (window.AUTO_CLICK_RECORDING_LINKS) a.click();
+              };
 
-            img.onerror = () => {
-              console.warn("Failed to load Apple Wallet image.");
-              a.textContent = "Download Pass";
-              container.innerHTML = "";
-              container.appendChild(a);
-              container.classList.add("show");
-              if (window.AUTO_CLICK_RECORDING_LINKS) a.click(); // fallback in case image fails
-            };
+              img.onerror = () => {
+                console.warn("Failed to load Apple Wallet image.");
+                a.textContent = "Download Pass";
+                container.innerHTML = "";
+                container.appendChild(a);
+                container.classList.add("show");
+                if (window.AUTO_CLICK_RECORDING_LINKS) a.click(); // fallback in case image fails
+              };
+            }
           }
         } else {
           const data = await res.json().catch(() => ({}));
