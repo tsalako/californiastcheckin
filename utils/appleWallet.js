@@ -282,6 +282,7 @@ async function getUpdatedSerialNumbers(deviceLibraryIdentifier, updatedSince) {
     (e) =>
       e.isUpdate &&
       new Date(e.updateTime) > updateSinceTime &&
+      e.devices &&
       e.devices.some(
         (d) => d.deviceLibraryIdentifier === deviceLibraryIdentifier
       )
