@@ -129,15 +129,17 @@ async function createApplePass(email, name, isUpdate = false) {
     metadata.authenticationToken = generateAuthToken();
     metadata.passTypeIdentifier = process.env.APPLE_PASS_TYPE_IDENTIFIER;
     metadata.teamIdentifier = process.env.APPLE_TEAM_ID;
-  } else if (!metadata.authenticationToken) {
-    metadata.name = name;
-    metadata.email = email;
-
-    // To help with existing passes that were made before push notifications were created.
-    metadata.authenticationToken = generateAuthToken();
-    metadata.passTypeIdentifier = process.env.APPLE_PASS_TYPE_IDENTIFIER;
-    metadata.teamIdentifier = process.env.APPLE_TEAM_ID;
   }
+
+  // Maybe back fill metadata so this code can be deleted.
+  if (!metadata.name) metadata.name = name;
+  if (!metadata.email) metadata.email = email;
+  if (!metadata.authenticationToken)
+    metadata.authenticationToken = generateAuthToken();
+  if (!metadata.passTypeIdentifier)
+    metadata.passTypeIdentifier = process.env.APPLE_PASS_TYPE_IDENTIFIER;
+  if (!metadata.teamIdentifier)
+    metadata.teamIdentifier = process.env.APPLE_TEAM_ID;
 
   if (!updates.updates) updates.updates = [];
   const entry = {};
@@ -234,7 +236,9 @@ async function registerDevice(
   deviceLibraryIdentifier,
   pushToken
 ) {
-  console.log(`registerDevice: ${serialNumber}, ${deviceLibraryIdentifier}, ${pushToken}`);
+  console.log(
+    `registerDevice: ${serialNumber}, ${deviceLibraryIdentifier}, ${pushToken}`
+  );
   const { metaFile } = getObjectInfoFromSN(serialNumber);
 
   console.time("metadata");
@@ -265,7 +269,9 @@ async function registerDevice(
 }
 
 async function getUpdatedSerialNumbers(deviceLibraryIdentifier, updatedSince) {
-  console.log(`getUpdatedSerialNumbers: ${deviceLibraryIdentifier}, ${updatedSince}`);
+  console.log(
+    `getUpdatedSerialNumbers: ${deviceLibraryIdentifier}, ${updatedSince}`
+  );
   // this is a hack, it should be removed.
   const { updatesFile } = getObjectInfoFromSN("");
 
@@ -274,7 +280,7 @@ async function getUpdatedSerialNumbers(deviceLibraryIdentifier, updatedSince) {
   console.timeEnd("updates");
 
   const updateSinceTime = new Date(parseInt(updatedSince, 10) || 0);
-    console.time("filter");
+  console.time("filter");
   const updatesSince = updates.updates.filter(
     (e) =>
       e.isUpdate &&
@@ -283,11 +289,12 @@ async function getUpdatedSerialNumbers(deviceLibraryIdentifier, updatedSince) {
         (d) => d.deviceLibraryIdentifier === deviceLibraryIdentifier
       )
   );
-    console.timeEnd("filter");
+  console.timeEnd("filter");
   if (updatesSince.length == 0) throw new Error("nothing found");
 
   const serials = updatesSince.map((e) => e.serialNumber);
-  const lastUpdate = updatesSince[updatesSince.length - 1].updateTime.toString();
+  const lastUpdate =
+    updatesSince[updatesSince.length - 1].updateTime.toString();
 
   return {
     serialNumbers: serials,
@@ -359,12 +366,10 @@ async function sendPushUpdateByEmail(email) {
   console.timeEnd("metadata");
   const devices = metadata.devices;
 
-  console.log("sendPushUpdateByEmail 2");
   if (!devices || devices.length === 0)
     throw new Error("No registered devices");
 
-   console.log(`sendPushUpdateByEmail 3 ${JSON.stringify(devices)}`);
-  const { authKey } = getCertFiles();
+  const { authKey } = await getCertFiles();
   const provider = new apn.Provider({
     token: {
       key: authKey,
@@ -373,16 +378,14 @@ async function sendPushUpdateByEmail(email) {
     },
     production: true,
   });
-   console.log("sendPushUpdateByEmail 4");
 
   const note = new apn.Notification();
   note.pushType = "background";
   note.topic = process.env.APPLE_PASS_TYPE_IDENTIFIER;
   note.expiry = Math.floor(Date.now() / 1000) + 3600;
-   console.log("sendPushUpdateByEmail 5");
+
   const results = [];
   for (const { pushToken } of devices) {
-     console.log("sendPushUpdateByEmail 6");
     const result = await provider.send(note, pushToken);
     console.log("sent:", result.sent.length);
     console.log("failed:", result.failed.length);
@@ -390,7 +393,6 @@ async function sendPushUpdateByEmail(email) {
     results.push(result);
   }
 
-   console.log("sendPushUpdateByEmail 7");
   provider.shutdown();
   return results;
 }

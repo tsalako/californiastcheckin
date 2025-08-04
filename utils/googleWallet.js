@@ -97,7 +97,10 @@ async function createGooglePass(email, name) {
     ? metadata.visitTimestamps
     : [];
   visitTimestamps.push(nowMillis);
+
   metadata.visitTimestamps = visitTimestamps;
+  metadata.name = name;
+  metadata.email = email;
 
   console.time("writeMetaFile");
   await writeJsonToGCS(metaFile, metadata);
@@ -163,6 +166,8 @@ async function updatePassObject(email, name) {
 
   visitTimestamps.push(nowMillis);
   metadata.visitTimestamps = visitTimestamps;
+  if (!metadata.name) metadata.name = name;
+  if (!metadata.email) metadata.email = email;
 
   console.time("writeMetaFile");
   await writeJsonToGCS(metaFile, metadata);
