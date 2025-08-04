@@ -275,7 +275,7 @@ async function getUpdatedSerialNumbers(deviceLibraryIdentifier, updatedSince) {
 
   const updateSinceTime = new Date(parseInt(updatedSince, 10) || 0);
     console.time("filter");
-  const updatesSince = updates.filter(
+  const updatesSince = updates.updates.filter(
     (e) =>
       e.isUpdate &&
       new Date(e.updateTime) > updateSinceTime &&
