@@ -122,6 +122,7 @@ async function createApplePass(email, name, isUpdate = false) {
   if (!isUpdate) {
     metadata.name = name;
     metadata.email = email;
+    metadata.createTime = nowMillis;
     metadata.serialNumber = serialNumber;
     metadata.authenticationToken = generateAuthToken();
     metadata.passTypeIdentifier = process.env.APPLE_PASS_TYPE_IDENTIFIER;
@@ -137,6 +138,7 @@ async function createApplePass(email, name, isUpdate = false) {
     metadata.passTypeIdentifier = process.env.APPLE_PASS_TYPE_IDENTIFIER;
   if (!metadata.teamIdentifier)
     metadata.teamIdentifier = process.env.APPLE_TEAM_ID;
+  if(!metadata.createTime) metadata.createTime = nowMillis;
 
   const entry = {};
   entry.name = name;

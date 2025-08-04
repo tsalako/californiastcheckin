@@ -106,16 +106,16 @@
         </div>
       </section>
 
-      <!-- New Passes Chart -->
-      <section>
-        <h2 class="text-xl font-semibold mb-2">📅 New Passes per Day</h2>
-        <canvas id="passesChart"></canvas>
-      </section>
-
       <!-- Visits Chart -->
       <section>
         <h2 class="text-xl font-semibold mb-2">📆 Visits per Day</h2>
         <canvas id="visitsChart"></canvas>
+      </section>
+
+      <!-- New Passes Chart -->
+      <section>
+        <h2 class="text-xl font-semibold mb-2">📅 New Passes per Day</h2>
+        <canvas id="passesChart"></canvas>
       </section>
 
       <!-- Update Log -->
@@ -164,29 +164,43 @@
         const counts = labels.map(d => data[d]);
 
         new Chart(document.getElementById(canvasId), {
-          type: 'line',
-          data: {
-            labels,
-            datasets: [{
-              label,
-              data: counts,
-              fill: true,
-              borderColor: 'rgb(59, 130, 246)',
-              backgroundColor: 'rgba(59, 130, 246, 0.2)',
-              tension: 0.3
-            }]
-          },
-          options: {
-            responsive: true,
-            plugins: {
-              legend: { display: false }
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                label,
+                data: counts,
+                fill: true,
+                borderColor: 'rgb(59, 130, 246)',
+                backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            title: function (context) {
+                            const rawDate = context[0].label;
+                            const date = new Date(`${rawDate}T00:00`);
+                            return date.toLocaleDateString('en-US', {
+                                weekday: 'short',
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric'
+                            });
+                            }
+                        }
+                    }
+                }
             }
-          }
         });
       }
 
-      renderChart("passesChart", passesData, "New Passes");
       renderChart("visitsChart", visitsData, "Visits");
+      renderChart("passesChart", passesData, "New Passes");
 
       function setThisWeek() {
         const today = new Date();

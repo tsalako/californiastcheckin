@@ -98,6 +98,7 @@ async function createGooglePass(email, name) {
   metadata.visitTimestamps = visitTimestamps;
   if (!metadata.name) metadata.name = name;
   if (!metadata.email) metadata.email = email;
+  if (!metadata.createTime) metadata.createTime = nowMillis;
 
   const entry = {};
   entry.name = name;
@@ -178,6 +179,7 @@ async function updatePassObject(email, name) {
   metadata.visitTimestamps = visitTimestamps;
   if (!metadata.name) metadata.name = name;
   if (!metadata.email) metadata.email = email;
+  if (!metadata.createTime) metadata.createTime = nowMillis;
 
   const entry = {};
   entry.name = name;

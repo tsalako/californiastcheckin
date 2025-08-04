@@ -35,11 +35,13 @@ router.get("/dashboard", async (req, res) => {
   if (!start && !end) {
     const today = new Date();
     const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-    start = monthStart.toISOString().split("T")[0];
-    end = today.toISOString().split("T")[0];
+    start = monthStart.toLocaleDateString("en-CA");
+    end = today.toLocaleDateString("en-CA");
   }
 
-  const updates = await readJsonFile(`updates${ENV_SUFFIX}.json`).catch(() => []);
+  const updates = await readJsonFile(`updates${ENV_SUFFIX}.json`).catch(
+    () => []
+  );
 
   const [metaFiles] = await storage
     .bucket(bucketName)
@@ -59,21 +61,20 @@ router.get("/dashboard", async (req, res) => {
           const name = meta.name || nameKey;
           const visits = (meta.visitTimestamps || []).length;
 
-          if (!isProduction || !excluded.has(nameKey)) {
-            userStats.push({ name, visits });
-          }
+          if (isProduction && excluded.has(nameKey)) return;
+
+          userStats.push({ name, visits });
 
           (meta.visitTimestamps || []).forEach((ts) => {
-            const day = new Date(ts).toISOString().split("T")[0];
+            const day = new Date(ts).toLocaleDateString("en-CA");
             if (isWithinDateRange(day, start, end)) {
               visitsPerDay[day] = (visitsPerDay[day] || 0) + 1;
             }
           });
 
-          const [metadata] = await file.getMetadata();
-          const created = metadata.timeCreated;
+          const created = meta.createTime || (meta.visitTimestamps || [])[0];
           if (created) {
-            const day = new Date(created).toISOString().split("T")[0];
+            const day = new Date(created).toLocaleDateString("en-CA");
             if (isWithinDateRange(day, start, end)) {
               passesPerDay[day] = (passesPerDay[day] || 0) + 1;
             }
