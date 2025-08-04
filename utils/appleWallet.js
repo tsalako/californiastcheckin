@@ -284,7 +284,7 @@ async function getUpdatedSerialNumbers(deviceLibraryIdentifier, updatedSince) {
       )
   );
     console.timeEnd("filter");
-  if (updateSince.length == 0) throw new Error("nothing found");
+  if (updatesSince.length == 0) throw new Error("nothing found");
 
   const serials = updatesSince.map((e) => e.serialNumber);
   const lastUpdate = updatesSince[updatesSince.length - 1].nowMillis.toString();
@@ -321,7 +321,7 @@ async function unregisterDevice(serialNumber, deviceLibraryIdentifier) {
 }
 
 async function getUpdatedPass(serialNumber, authHeader) {
-   console.log("getUpdatedPass");
+  console.log(`getUpdatedPass ${serialNumber} ${authHeader}`);
   const { passFile, metaFile } = getObjectInfoFromSN(serialNumber);
 
   console.time("pass and metadata");
