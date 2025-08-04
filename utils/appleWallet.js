@@ -359,9 +359,11 @@ async function sendPushUpdateByEmail(email) {
   console.timeEnd("metadata");
   const devices = metadata.devices;
 
+  console.log("sendPushUpdateByEmail 2");
   if (!devices || devices.length === 0)
     throw new Error("No registered devices");
 
+   console.log(`sendPushUpdateByEmail 3 ${devices}`);
   const { authKey } = getCertFiles();
   const provider = new apn.Provider({
     token: {
@@ -379,6 +381,7 @@ async function sendPushUpdateByEmail(email) {
 
   const results = [];
   for (const { pushToken } of devices) {
+     console.log("sendPushUpdateByEmail 4");
     const result = await provider.send(note, pushToken);
     console.log("sent:", result.sent.length);
     console.log("failed:", result.failed.length);
@@ -386,6 +389,7 @@ async function sendPushUpdateByEmail(email) {
     results.push(result);
   }
 
+   console.log("sendPushUpdateByEmail 5");
   provider.shutdown();
   return results;
 }
