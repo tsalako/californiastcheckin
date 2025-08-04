@@ -18,8 +18,8 @@ const passOutputDir = "apple/passes";
 
 const ENVIRONMENT = process.env.NODE_ENV || "development";
 const isProduction = ENVIRONMENT === "production";
-const visitThrottleEnabled =
-  process.env.APPLE_THROTTLE_OVERRIDE === "true" || isProduction;
+const ENV_SUFFIX = isProduction ? "" : "_staging";
+const visitThrottleEnabled = isProduction;
 
 function generateAuthToken() {
   return crypto.randomBytes(16).toString("hex"); // 32-char token
@@ -35,7 +35,7 @@ function getObjectInfoFromSN(serialNumber) {
     serialNumber,
     passFile: `${passOutputDir}/${serialNumber}.pkpass`,
     metaFile: `${metaDir}/${serialNumber}.json`,
-    updatesFile: `${certDir}/updates.json`,
+    updatesFile: `${certDir}/updates${ENV_SUFFIX}.json`,
   };
 }
 

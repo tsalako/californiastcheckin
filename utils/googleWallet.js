@@ -25,8 +25,7 @@ const walletClient = new GoogleAuth({
 const storage = new Storage({ credentials });
 const BUCKET_NAME = process.env.GCS_BUCKET_NAME;
 const metaDir = "meta";
-const visitThrottleEnabled =
-  process.env.APPLE_THROTTLE_OVERRIDE === "true" || isProduction;
+const visitThrottleEnabled = isProduction;
 
 function getObjectInfo(email) {
   const objectSuffix = email.replace(/[^\w-]/g, "_").replace(/\./g, "_");
