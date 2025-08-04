@@ -234,7 +234,7 @@ async function registerDevice(
   deviceLibraryIdentifier,
   pushToken
 ) {
-  console.log("registerDevice");
+  console.log(`registerDevice: ${serialNumber}, ${deviceLibraryIdentifier}, ${pushToken}`);
   const { metaFile } = getObjectInfoFromSN(serialNumber);
 
   console.time("metadata");
@@ -265,7 +265,7 @@ async function registerDevice(
 }
 
 async function getUpdatedSerialNumbers(deviceLibraryIdentifier, updatedSince) {
-  console.log("getUpdatedSerialNumbers");
+  console.log(`getUpdatedSerialNumbers: ${deviceLibraryIdentifier}, ${updatedSince}`);
   // this is a hack, it should be removed.
   const { updatesFile } = getObjectInfoFromSN("");
 
@@ -296,7 +296,7 @@ async function getUpdatedSerialNumbers(deviceLibraryIdentifier, updatedSince) {
 }
 
 async function unregisterDevice(serialNumber, deviceLibraryIdentifier) {
-  console.log("unregisterDevice");
+  console.log(`unregisterDevice: ${serialNumber}, ${deviceLibraryIdentifier}`);
   const { metaFile } = getObjectInfoFromSN(serialNumber);
 
   console.time("metadata");
@@ -318,10 +318,12 @@ async function unregisterDevice(serialNumber, deviceLibraryIdentifier) {
       resumable: false,
     });
   console.timeEnd("write metadata to GCS");
+
+  // i should also delete the pass at this point.
 }
 
 async function getUpdatedPass(serialNumber, authHeader) {
-  console.log(`getUpdatedPass ${serialNumber} ${authHeader}`);
+  console.log(`getUpdatedPass: ${serialNumber}, ${authHeader}`);
   const { passFile, metaFile } = getObjectInfoFromSN(serialNumber);
 
   console.time("pass and metadata");
@@ -349,7 +351,7 @@ async function getUpdatedPass(serialNumber, authHeader) {
 }
 
 async function sendPushUpdateByEmail(email) {
-  console.log("sendPushUpdateByEmail");
+  console.log(`sendPushUpdateByEmail: ${email}`);
   const { metaFile } = getObjectInfo(email);
 
   console.time("metadata");

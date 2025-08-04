@@ -299,7 +299,15 @@
           const data = await res.json();
           if (platform === "apple") {
             if (data.hasRegisteredDevice) {
-              await fetch(`/push-update?email=${encodeURIComponent(email)}`);
+              try {
+                await fetch(`/push-update?email=${encodeURIComponent(email)}`);
+              } catch (err) {
+                feedbackEl.textContent =
+                  err.message || "⚠️ Failed to record visit.";
+                feedbackEl.classList.add("show");
+                recordVisit.textContent = "Record Visit";
+                recordVisit.disabled = false;
+              }
             } else if (data.url) {
               const container = document.getElementById("button");
               const a = document.createElement("a");
