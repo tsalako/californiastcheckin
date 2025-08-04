@@ -363,7 +363,7 @@ async function sendPushUpdateByEmail(email) {
   if (!devices || devices.length === 0)
     throw new Error("No registered devices");
 
-   console.log(`sendPushUpdateByEmail 3 ${devices}`);
+   console.log(`sendPushUpdateByEmail 3 ${JSON.stringify(devices)}`);
   const { authKey } = getCertFiles();
   const provider = new apn.Provider({
     token: {
