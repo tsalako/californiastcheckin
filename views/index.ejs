@@ -298,17 +298,17 @@
           recordVisit.textContent = "Recorded!";
           const data = await res.json();
           if (platform === "apple") {
-            // if (data.hasRegisteredDevice) {
-            //   try {
-            //     await fetch(`/push-update?email=${encodeURIComponent(email)}`);
-            //   } catch (err) {
-            //     feedbackEl.textContent =
-            //       err.message || "⚠️ Failed to record visit.";
-            //     feedbackEl.classList.add("show");
-            //     recordVisit.textContent = "Record Visit";
-            //     recordVisit.disabled = false;
-            //   }
-            // } else if (data.url) {
+            if (data.hasRegisteredDevice) {
+              try {
+                await fetch(`/push-update?email=${encodeURIComponent(email)}`);
+              } catch (err) {
+                feedbackEl.textContent =
+                  err.message || "⚠️ Failed to record visit.";
+                feedbackEl.classList.add("show");
+                recordVisit.textContent = "Record Visit";
+                recordVisit.disabled = false;
+              }
+            } else if (data.url) {
               const container = document.getElementById("button");
               const a = document.createElement("a");
               a.href = data.url;
@@ -335,7 +335,7 @@
                 container.classList.add("show");
                 if (window.AUTO_CLICK_RECORDING_LINKS) a.click(); // fallback in case image fails
               };
-            // }
+            }
           }
         } else {
           const data = await res.json().catch(() => ({}));
