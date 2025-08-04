@@ -36,6 +36,7 @@ app.get("/", (req, res) => {
     autoVisitRecording: process.env.AUTO_VISIT_RECORDING === "true",
     autoClickCreationLinks: process.env.AUTO_CLICK_CREATION_LINKS === "true",
     autoClickRecordingLinks: process.env.AUTO_CLICK_RECORDING_LINKS === "true",
+    udpateAppleWallet: process.env.UPDATE_APPLE_WALLET === "true",
   });
 });
 
