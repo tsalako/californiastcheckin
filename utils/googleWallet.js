@@ -3,7 +3,6 @@ const { GoogleAuth, OAuth2Client } = require("google-auth-library");
 const jwt = require("jsonwebtoken");
 const { formatInTimeZone } = require("date-fns-tz");
 const { Storage } = require("@google-cloud/storage");
-require("dotenv").config();
 
 const issuerId = process.env.GOOGLE_WALLET_ISSUER_ID;
 const ENVIRONMENT = process.env.NODE_ENV || "development";
@@ -13,10 +12,8 @@ const classSuffix = `csd${ENV_SUFFIX}`;
 const postpend = process.env.GOOGLE_WALLET_POSTPEND || ENV_SUFFIX;
 const classId = `${issuerId}.${classSuffix}`;
 
-const audience = process.env.GOOGLE_CLIENT_ID;
 const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
 
-const authClient = new OAuth2Client();
 const walletClient = new GoogleAuth({
   credentials,
   scopes: "https://www.googleapis.com/auth/wallet_object.issuer",
@@ -34,6 +31,7 @@ function getObjectInfo(email) {
     objectSuffix,
     objectId,
     metaFile: `${metaDir}/${objectSuffix}.json`,
+    updatesFile: `updates${ENV_SUFFIX}.json`,
   };
 }
 
@@ -79,15 +77,14 @@ async function hasGooglePass(email) {
 
 async function createGooglePass(email, name) {
   console.log("createGooglePass");
-  const { objectId, metaFile } = getObjectInfo(email);
-  let metadata = {};
-  try {
-    console.time("readMetaFile");
-    metadata = await readJsonFromGCS(metaFile);
-    console.timeEnd("readMetaFile");
-  } catch (e) {
-    metadata = {};
-  }
+  const { objectId, metaFile, updatesFile } = getObjectInfo(email);
+
+  console.time("updates and metadata");
+  const [updates, metadata] = await Promise.all([
+    readJsonFromGCS(updatesFile).catch(() => []),
+    readJsonFromGCS(metaFile).catch(() => ({})),
+  ]);
+  console.timeEnd("updates and metadata");
 
   const now = new Date();
   const nowMillis = now.getTime();
@@ -99,13 +96,21 @@ async function createGooglePass(email, name) {
   visitTimestamps.push(nowMillis);
 
   metadata.visitTimestamps = visitTimestamps;
-  metadata.name = name;
-  metadata.email = email;
+  if (!metadata.name) metadata.name = name;
+  if (!metadata.email) metadata.email = email;
 
-  // TODO: write to updates
-  console.time("writeMetaFile");
-  await writeJsonToGCS(metaFile, metadata);
-  console.timeEnd("writeMetaFile");
+  const entry = {};
+  entry.name = name;
+  entry.updateTime = nowMillis;
+  entry.isUpdate = false;
+  updates.push(entry);
+
+    console.time("write updates and metadata");
+  await Promise.all([
+    writeJsonToGCS(metaFile, metadata),
+    writeJsonToGCS(updatesFile, updates),
+  ]);
+  console.timeEnd("write updates and metadata");
 
   const loyaltyObject = {
     accountName: name,
@@ -142,10 +147,14 @@ async function createGooglePass(email, name) {
 
 async function updatePassObject(email, name) {
   console.log("updatePassObject");
-  const { objectId, metaFile } = getObjectInfo(email);
-  console.time("readMetaFile");
-  let metadata = await readJsonFromGCS(metaFile);
-  console.timeEnd("readMetaFile");
+  const { objectId, metaFile, updatesFile } = getObjectInfo(email);
+
+  console.time("updates and metadata");
+  const [updates, metadata] = await Promise.all([
+    readJsonFromGCS(updatesFile).catch(() => []),
+    readJsonFromGCS(metaFile).catch(() => ({})),
+  ]);
+  console.timeEnd("updates and metadata");
 
   const now = new Date();
   const nowMillis = now.getTime();
@@ -170,10 +179,18 @@ async function updatePassObject(email, name) {
   if (!metadata.name) metadata.name = name;
   if (!metadata.email) metadata.email = email;
 
-  // TODO: write to updates
-  console.time("writeMetaFile");
-  await writeJsonToGCS(metaFile, metadata);
-  console.timeEnd("writeMetaFile");
+  const entry = {};
+  entry.name = name;
+  entry.updateTime = nowMillis;
+  entry.isUpdate = true;
+  updates.push(entry);
+
+    console.time("write updates and metadata");
+  await Promise.all([
+    writeJsonToGCS(metaFile, metadata),
+    writeJsonToGCS(updatesFile, updates),
+  ]);
+  console.timeEnd("write updates and metadata");
 
   const patchBody = {
     loyaltyPoints: { balance: { int: visitTimestamps.length } },

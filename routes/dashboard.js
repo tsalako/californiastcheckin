@@ -1,5 +1,4 @@
 const express = require("express");
-const path = require("path");
 const { Storage } = require("@google-cloud/storage");
 const router = express.Router();
 
@@ -13,16 +12,12 @@ const excluded = new Set([
   "tsalako12_gmail_com",
   "testtacocat_gmail_com",
 ]);
+const ENV_SUFFIX = isProduction ? "" : "_staging";
 
 async function readJsonFile(filename) {
-  try {
-    const file = storage.bucket(bucketName).file(filename);
-    const [contents] = await file.download();
-    return JSON.parse(contents.toString());
-  } catch (err) {
-    console.error("Failed to read file:", filename, err);
-    return null;
-  }
+  const file = storage.bucket(bucketName).file(filename);
+  const [contents] = await file.download();
+  return JSON.parse(contents.toString());
 }
 
 function isWithinDateRange(dateStr, startDate, endDate) {
@@ -43,7 +38,7 @@ router.get("/dashboard", async (req, res) => {
     end = today.toISOString().split("T")[0];
   }
 
-  const updates = (await readJsonFile("apple/updates.json")) || { updates: [] };
+  const updates = await readJsonFile(`updates${ENV_SUFFIX}.json`).catch(() => []);
 
   const [metaFiles] = await storage
     .bucket(bucketName)
@@ -89,16 +84,14 @@ router.get("/dashboard", async (req, res) => {
   );
 
   userStats.sort((a, b) => b.visits - a.visits);
-  updates.updates.sort(
-    (a, b) => new Date(b.updateTime) - new Date(a.updateTime)
-  );
+  updates.sort((a, b) => new Date(b.updateTime) - new Date(a.updateTime));
 
   res.render("dashboard", {
     leaderboard: userStats.map((u, i) => ({ ...u, rank: i + 1 })),
     visitsPerDay,
     passesPerDay,
-    updateLog: updates.updates.map((u) => ({
-      serialNumber: u.serialNumber,
+    updateLog: updates.map((u) => ({
+      name: u.name || u.serialNumber,
       updateTime: u.updateTime,
       isUpdate: u.isUpdate,
       hasDevices: !!(u.devices && u.devices.length),

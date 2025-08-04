@@ -1,12 +1,9 @@
 const { Storage } = require("@google-cloud/storage");
-const tmp = require("tmp-promise");
-const fs = require("fs/promises");
 const path = require("path");
 const { PKPass } = require("passkit-generator");
 const { formatInTimeZone } = require("date-fns-tz");
 const crypto = require("crypto");
 const apn = require("apn");
-require("dotenv").config();
 
 const BUCKET_NAME = process.env.GCS_BUCKET_NAME;
 const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
@@ -35,7 +32,7 @@ function getObjectInfoFromSN(serialNumber) {
     serialNumber,
     passFile: `${passOutputDir}/${serialNumber}.pkpass`,
     metaFile: `${metaDir}/${serialNumber}.json`,
-    updatesFile: `${certDir}/updates${ENV_SUFFIX}.json`,
+    updatesFile: `updates${ENV_SUFFIX}.json`,
   };
 }
 
@@ -97,8 +94,7 @@ async function createApplePass(email, name, isUpdate = false) {
   console.time("certs and metadata");
   const [{ cert, key, wwdr }, updates, metadata] = await Promise.all([
     getCertFiles(),
-    // TODO: maybe have updates file be a list instead of an object
-    readJsonFromGCS(updatesFile).catch(() => ({})),
+    readJsonFromGCS(updatesFile).catch(() => []),
     readJsonFromGCS(metaFile).catch(() => ({})),
   ]);
   console.timeEnd("certs and metadata");
@@ -142,13 +138,13 @@ async function createApplePass(email, name, isUpdate = false) {
   if (!metadata.teamIdentifier)
     metadata.teamIdentifier = process.env.APPLE_TEAM_ID;
 
-  if (!updates.updates) updates.updates = [];
   const entry = {};
+  entry.name = name;
   entry.serialNumber = serialNumber;
   entry.updateTime = nowMillis;
   entry.isUpdate = isUpdate;
   entry.devices = metadata.devices || []; // may not work depending on when the device is registered.
-  updates.updates.push(entry);
+  updates.push(entry);
 
   const hasRegisteredDevice = metadata.devices != null;
 
@@ -277,12 +273,12 @@ async function getUpdatedSerialNumbers(deviceLibraryIdentifier, updatedSince) {
   const { updatesFile } = getObjectInfoFromSN("");
 
   console.time("updates");
-  const updates = await readJsonFromGCS(updatesFile).catch(() => ({}));
+  const updates = await readJsonFromGCS(updatesFile).catch(() => []);
   console.timeEnd("updates");
 
   const updateSinceTime = new Date(parseInt(updatedSince, 10) || 0);
   console.time("filter");
-  const updatesSince = updates.updates.filter(
+  const updatesSince = updates.filter(
     (e) =>
       e.isUpdate &&
       new Date(e.updateTime) > updateSinceTime &&

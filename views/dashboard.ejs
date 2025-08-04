@@ -14,20 +14,68 @@
       <!-- Date Range Filter -->
       <form class="flex flex-wrap gap-4 mb-6 items-end" method="GET">
         <div>
-          <label class="block text-sm font-medium text-gray-700" for="start">Start Date</label>
-          <input class="border border-gray-300 p-2 rounded" type="date" id="start" name="start" value="<%= start || '' %>">
+          <label class="block text-sm font-medium text-gray-700" for="start"
+            >Start Date</label
+          >
+          <input
+            class="border border-gray-300 p-2 rounded"
+            type="date"
+            id="start"
+            name="start"
+            value="<%= start || '' %>"
+          />
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700" for="end">End Date</label>
-          <input class="border border-gray-300 p-2 rounded" type="date" id="end" name="end" value="<%= end || '' %>">
+          <label class="block text-sm font-medium text-gray-700" for="end"
+            >End Date</label
+          >
+          <input
+            class="border border-gray-300 p-2 rounded"
+            type="date"
+            id="end"
+            name="end"
+            value="<%= end || '' %>"
+          />
         </div>
-        <button class="bg-blue-500 text-white px-4 py-2 rounded" type="submit">Apply</button>
+        <button class="bg-blue-500 text-white px-4 py-2 rounded" type="submit">
+          Apply
+        </button>
         <div class="flex flex-wrap gap-2">
-          <button class="bg-gray-400 text-white px-4 py-2 rounded" type="button" onclick="setYesterday()">Yesterday</button>
-          <button class="bg-gray-400 text-white px-4 py-2 rounded" type="button" onclick="setThisWeek()">This Week</button>  
-          <button class="bg-gray-400 text-white px-4 py-2 rounded" type="button" onclick="setThisMonth()">This Month</button>
-          <button class="bg-gray-400 text-white px-4 py-2 rounded" type="button" onclick="setThisQuarter()">This Quarter</button>
-          <button class="bg-gray-400 text-white px-4 py-2 rounded" type="button" onclick="setThisYear()">This Year</button>
+          <button
+            class="bg-gray-400 text-white px-4 py-2 rounded"
+            type="button"
+            onclick="setYesterday()"
+          >
+            Yesterday
+          </button>
+          <button
+            class="bg-gray-400 text-white px-4 py-2 rounded"
+            type="button"
+            onclick="setThisWeek()"
+          >
+            This Week
+          </button>
+          <button
+            class="bg-gray-400 text-white px-4 py-2 rounded"
+            type="button"
+            onclick="setThisMonth()"
+          >
+            This Month
+          </button>
+          <button
+            class="bg-gray-400 text-white px-4 py-2 rounded"
+            type="button"
+            onclick="setThisQuarter()"
+          >
+            This Quarter
+          </button>
+          <button
+            class="bg-gray-400 text-white px-4 py-2 rounded"
+            type="button"
+            onclick="setThisYear()"
+          >
+            This Year
+          </button>
         </div>
       </form>
 
@@ -46,17 +94,16 @@
               </thead>
               <tbody>
                 <% leaderboard.forEach(user => { %>
-                  <tr class="border-t">
-                    <td class="p-3"><%= user.rank %></td>
-                    <td class="p-3"><%= user.name %></td>
-                    <td class="p-3"><%= user.visits %></td>
-                  </tr>
+                <tr class="border-t">
+                  <td class="p-3"><%= user.rank %></td>
+                  <td class="p-3"><%= user.name %></td>
+                  <td class="p-3"><%= user.visits %></td>
+                </tr>
                 <% }) %>
               </tbody>
             </table>
           </div>
         </div>
-      </section>
       </section>
 
       <!-- New Passes Chart -->
@@ -74,26 +121,37 @@
       <!-- Update Log -->
       <section>
         <h2 class="text-xl font-semibold mb-2">📋 Update Log</h2>
-        <table class="w-full text-left bg-white rounded shadow">
-          <thead>
-            <tr class="bg-gray-200">
-              <th class="p-3">Serial</th>
-              <th class="p-3">Update Time</th>
-              <th class="p-3">Is Update?</th>
-              <th class="p-3">Has Devices?</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% updateLog.forEach(row => { %>
-              <tr class="border-t">
-                <td class="p-3"><%= row.serialNumber %></td>
-                <td class="p-3"><%= row.updateTime %></td>
-                <td class="p-3"><%= row.isUpdate %></td>
-                <td class="p-3"><%= row.hasDevices %></td>
-              </tr>
-            <% }) %>
-          </tbody>
-        </table>
+        <div class="overflow-x-auto">
+          <div class="overflow-y-auto max-h-96">
+            <table class="w-full text-left bg-white rounded shadow">
+              <thead class="sticky top-0 bg-gray-200 z-10">
+                <tr>
+                  <th class="p-3">Name</th>
+                  <th class="p-3">Update Time</th>
+                  <th class="p-3">Action</th>
+                  <th class="p-3">Has Devices?</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% updateLog.forEach(row => { %>
+                <tr class="border-t">
+                  <td class="p-3"><%= row.name %></td>
+                  <td class="p-3">
+                    <%= new Date(row.updateTime).toLocaleString('en-US', {
+                    weekday: 'short', month: 'short', day: 'numeric', year:
+                    'numeric', hour: 'numeric', minute: '2-digit', hour12: true
+                    }) %>
+                  </td>
+                  <td class="p-3">
+                    <%= row.isUpdate ? 'Visited' : 'Created' %>
+                  </td>
+                  <td class="p-3"><%= row.hasDevices ? '✅' : '❌' %></td>
+                </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </section>
     </div>
 
