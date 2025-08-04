@@ -2,7 +2,8 @@ const express = require("express");
 const { Storage } = require("@google-cloud/storage");
 const router = express.Router();
 
-const storage = new Storage();
+const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+const storage = new Storage({ credentials });
 const bucketName = process.env.GCS_BUCKET_NAME;
 
 const isProduction = process.env.NODE_ENV === "production";

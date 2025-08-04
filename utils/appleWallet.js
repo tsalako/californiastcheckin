@@ -148,6 +148,7 @@ async function createApplePass(email, name, isUpdate = false) {
 
   const hasRegisteredDevice = metadata.devices != null;
 
+  // TODO: get images from GCS instead of locally.
   console.time("generate pass");
   const pass = await PKPass.from(
     {
