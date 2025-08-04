@@ -11,27 +11,52 @@
     <div class="max-w-6xl mx-auto p-6 space-y-10">
       <h1 class="text-3xl font-bold">📈 Analytics Dashboard</h1>
 
+      <!-- Date Range Filter -->
+      <form class="flex flex-wrap gap-4 mb-6 items-end" method="GET">
+        <div>
+          <label class="block text-sm font-medium text-gray-700" for="start">Start Date</label>
+          <input class="border border-gray-300 p-2 rounded" type="date" id="start" name="start" value="<%= start || '' %>">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700" for="end">End Date</label>
+          <input class="border border-gray-300 p-2 rounded" type="date" id="end" name="end" value="<%= end || '' %>">
+        </div>
+        <button class="bg-blue-500 text-white px-4 py-2 rounded" type="submit">Apply</button>
+        <div class="flex flex-wrap gap-2">
+          <button class="bg-gray-400 text-white px-4 py-2 rounded" type="button" onclick="setYesterday()">Yesterday</button>
+          <button class="bg-gray-400 text-white px-4 py-2 rounded" type="button" onclick="setThisWeek()">This Week</button>  
+          <button class="bg-gray-400 text-white px-4 py-2 rounded" type="button" onclick="setThisMonth()">This Month</button>
+          <button class="bg-gray-400 text-white px-4 py-2 rounded" type="button" onclick="setThisQuarter()">This Quarter</button>
+          <button class="bg-gray-400 text-white px-4 py-2 rounded" type="button" onclick="setThisYear()">This Year</button>
+        </div>
+      </form>
+
       <!-- Leaderboard -->
       <section>
         <h2 class="text-xl font-semibold mb-2">🏆 Leaderboard</h2>
-        <table class="w-full text-left bg-white rounded shadow">
-          <thead>
-            <tr class="bg-gray-200">
-              <th class="p-3">Rank</th>
-              <th class="p-3">Name</th>
-              <th class="p-3">Visits</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% leaderboard.forEach(user => { %>
-              <tr class="border-t">
-                <td class="p-3"><%= user.rank %></td>
-                <td class="p-3"><%= user.name %></td>
-                <td class="p-3"><%= user.visits %></td>
-              </tr>
-            <% }) %>
-          </tbody>
-        </table>
+        <div class="overflow-x-auto">
+          <div class="overflow-y-auto max-h-96">
+            <table class="w-full text-left bg-white rounded shadow">
+              <thead class="sticky top-0 bg-gray-200 z-10">
+                <tr>
+                  <th class="p-3">Rank</th>
+                  <th class="p-3">Name</th>
+                  <th class="p-3">Visits</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% leaderboard.forEach(user => { %>
+                  <tr class="border-t">
+                    <td class="p-3"><%= user.rank %></td>
+                    <td class="p-3"><%= user.name %></td>
+                    <td class="p-3"><%= user.visits %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
       </section>
 
       <!-- New Passes Chart -->
@@ -104,6 +129,50 @@
 
       renderChart("passesChart", passesData, "New Passes");
       renderChart("visitsChart", visitsData, "Visits");
+
+      function setThisWeek() {
+        const today = new Date();
+        const start = new Date();
+        start.setDate(today.getDate() - today.getDay()); // Sunday
+        document.getElementById("start").value = start.toISOString().split("T")[0];
+        document.getElementById("end").value = today.toISOString().split("T")[0];
+        document.querySelector("form").submit();
+      }
+
+      function setYesterday() {
+        const y = new Date();
+        y.setDate(y.getDate() - 1);
+        const yStr = y.toISOString().split("T")[0];
+        document.getElementById("start").value = yStr;
+        document.getElementById("end").value = yStr;
+        document.querySelector("form").submit();
+      }
+
+      function setThisMonth() {
+        const today = new Date();
+        const start = new Date(today.getFullYear(), today.getMonth(), 1);
+        document.getElementById("start").value = start.toISOString().split("T")[0];
+        document.getElementById("end").value = today.toISOString().split("T")[0];
+        document.querySelector("form").submit();
+      }
+
+      function setThisYear() {
+        const today = new Date();
+        const start = new Date(today.getFullYear(), 0, 1);
+        document.getElementById("start").value = start.toISOString().split("T")[0];
+        document.getElementById("end").value = today.toISOString().split("T")[0];
+        document.querySelector("form").submit();
+      }
+
+      function setThisQuarter() {
+        const today = new Date();
+        const quarter = Math.floor(today.getMonth() / 3);
+        const startMonth = quarter * 3;
+        const start = new Date(today.getFullYear(), startMonth, 1);
+        document.getElementById("start").value = start.toISOString().split("T")[0];
+        document.getElementById("end").value = today.toISOString().split("T")[0];
+        document.querySelector("form").submit();
+      }
     </script>
   </body>
 </html>

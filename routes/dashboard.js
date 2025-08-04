@@ -6,6 +6,14 @@ const router = express.Router();
 const storage = new Storage();
 const bucketName = process.env.GCS_BUCKET_NAME;
 
+const isProduction = process.env.NODE_ENV === "production";
+const excluded = new Set([
+  "vic_anibarro_gmail_com",
+  "mitchell_celicious_gmail_com",
+  "tsalako12_gmail_com",
+  "testtacocat_gmail_com",
+]);
+
 async function readJsonFile(filename) {
   try {
     const file = storage.bucket(bucketName).file(filename);
@@ -17,7 +25,24 @@ async function readJsonFile(filename) {
   }
 }
 
+function isWithinDateRange(dateStr, startDate, endDate) {
+  const date = new Date(dateStr);
+  return (
+    (!startDate || date >= new Date(startDate)) &&
+    (!endDate || date <= new Date(endDate))
+  );
+}
+
 router.get("/dashboard", async (req, res) => {
+  let { start, end } = req.query;
+
+  if (!start && !end) {
+    const today = new Date();
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    start = monthStart.toISOString().split("T")[0];
+    end = today.toISOString().split("T")[0];
+  }
+
   const updates = (await readJsonFile("apple/updates.json")) || { updates: [] };
 
   const [metaFiles] = await storage
@@ -29,32 +54,38 @@ router.get("/dashboard", async (req, res) => {
 
   await Promise.all(
     metaFiles
-    .filter(file => file.name.endsWith(".json") && file.name !== "meta/")
-    .map(async (file) => {
-      try {
-        const [contents] = await file.download();
-        const meta = JSON.parse(contents.toString());
-        const name = meta.name || file.name.split("/").pop().split(".")[0];
-        const visits = (meta.visitTimestamps || []).length;
+      .filter((file) => file.name.endsWith(".json") && file.name !== "meta/")
+      .map(async (file) => {
+        try {
+          const [contents] = await file.download();
+          const meta = JSON.parse(contents.toString());
+          const nameKey = file.name.split("/").pop().split(".")[0];
+          const name = meta.name || nameKey;
+          const visits = (meta.visitTimestamps || []).length;
 
-        userStats.push({ name, visits });
+          if (!isProduction || !excluded.has(nameKey)) {
+            userStats.push({ name, visits });
+          }
 
-        (meta.visitTimestamps || []).forEach((ts) => {
-          const day = new Date(ts).toISOString().split("T")[0];
-          visitsPerDay[day] = (visitsPerDay[day] || 0) + 1;
-        });
+          (meta.visitTimestamps || []).forEach((ts) => {
+            const day = new Date(ts).toISOString().split("T")[0];
+            if (isWithinDateRange(day, start, end)) {
+              visitsPerDay[day] = (visitsPerDay[day] || 0) + 1;
+            }
+          });
 
-        // Use file metadata creation date for pass creation date
-        const [metadata] = await file.getMetadata();
-        const created = metadata.timeCreated;
-        if (created) {
-          const day = new Date(created).toISOString().split("T")[0];
-          passesPerDay[day] = (passesPerDay[day] || 0) + 1;
+          const [metadata] = await file.getMetadata();
+          const created = metadata.timeCreated;
+          if (created) {
+            const day = new Date(created).toISOString().split("T")[0];
+            if (isWithinDateRange(day, start, end)) {
+              passesPerDay[day] = (passesPerDay[day] || 0) + 1;
+            }
+          }
+        } catch (err) {
+          console.warn("Error processing meta file:", file.name, err);
         }
-      } catch (err) {
-        console.warn("Error processing meta file:", file.name, err);
-      }
-    })
+      })
   );
 
   userStats.sort((a, b) => b.visits - a.visits);
@@ -72,6 +103,8 @@ router.get("/dashboard", async (req, res) => {
       isUpdate: u.isUpdate,
       hasDevices: !!(u.devices && u.devices.length),
     })),
+    start,
+    end,
   });
 });
 
