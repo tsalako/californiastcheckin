@@ -123,11 +123,16 @@ async function createApplePass(email, name, isUpdate = false) {
 
   metadata.visitTimestamps = visitTimestamps;
   if (!isUpdate) {
+    metadata.name = name;
+    metadata.email = email;
     metadata.serialNumber = serialNumber;
     metadata.authenticationToken = generateAuthToken();
     metadata.passTypeIdentifier = process.env.APPLE_PASS_TYPE_IDENTIFIER;
     metadata.teamIdentifier = process.env.APPLE_TEAM_ID;
   } else if (!metadata.authenticationToken) {
+    metadata.name = name;
+    metadata.email = email;
+
     // To help with existing passes that were made before push notifications were created.
     metadata.authenticationToken = generateAuthToken();
     metadata.passTypeIdentifier = process.env.APPLE_PASS_TYPE_IDENTIFIER;

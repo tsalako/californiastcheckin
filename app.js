@@ -79,7 +79,7 @@ app.post("/create-pass", async (req, res) => {
   console.time("createPass");
   try {
     if (platform === "apple") {
-      const url = await createApplePass(email, name, false);
+      const { url } = await createApplePass(email, name, false);
       res.json({ url });
     } else {
       await createPassClass();
