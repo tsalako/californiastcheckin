@@ -123,21 +123,6 @@
         <h2 class="text-xl font-semibold mb-2">📋 Update Log</h2>
         <div class="overflow-x-auto">
           <div class="overflow-y-auto max-h-96">
-            <div class="mb-2">
-              <label
-                for="filterType"
-                class="text-sm font-medium text-gray-700 mr-2"
-                >Filter:</label
-              >
-              <select
-                id="filterType"
-                class="border border-gray-300 p-2 rounded"
-              >
-                <option value="all">All</option>
-                <option value="visited">Visited</option>
-                <option value="created">Created</option>
-              </select>
-            </div>
             <table class="w-full text-left bg-white rounded shadow">
               <thead class="sticky top-0 bg-gray-200 z-10">
                 <tr>
@@ -149,10 +134,7 @@
               </thead>
               <tbody>
                 <% updateLog.forEach(row => { %>
-                <tr
-                  class="border-t update-row"
-                  data-type="<%= row.isUpdate ? 'visited' : 'created' %>"
-                >
+                <tr class="border-t">
                   <td class="p-3"><%= row.name %></td>
                   <td class="p-3">
                     <%= new Date(row.updateTime).toLocaleString('en-US', {
@@ -174,91 +156,81 @@
     </div>
 
     <script>
-            const passesData = <%- JSON.stringify(passesPerDay) %>;
-            const visitsData = <%- JSON.stringify(visitsPerDay) %>;
+      const passesData = <%- JSON.stringify(passesPerDay) %>;
+      const visitsData = <%- JSON.stringify(visitsPerDay) %>;
 
-            function renderChart(canvasId, data, label) {
-              const labels = Object.keys(data).sort();
-              const counts = labels.map(d => data[d]);
+      function renderChart(canvasId, data, label) {
+        const labels = Object.keys(data).sort();
+        const counts = labels.map(d => data[d]);
 
-              new Chart(document.getElementById(canvasId), {
-                type: 'line',
-                data: {
-                  labels,
-                  datasets: [{
-                    label,
-                    data: counts,
-                    fill: true,
-                    borderColor: 'rgb(59, 130, 246)',
-                    backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                    tension: 0.3
-                  }]
-                },
-                options: {
-                  responsive: true,
-                  plugins: {
-                    legend: { display: false }
-                  }
-                }
-              });
+        new Chart(document.getElementById(canvasId), {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [{
+              label,
+              data: counts,
+              fill: true,
+              borderColor: 'rgb(59, 130, 246)',
+              backgroundColor: 'rgba(59, 130, 246, 0.2)',
+              tension: 0.3
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: { display: false }
             }
-
-            renderChart("passesChart", passesData, "New Passes");
-            renderChart("visitsChart", visitsData, "Visits");
-
-            function setThisWeek() {
-              const today = new Date();
-              const start = new Date();
-              start.setDate(today.getDate() - today.getDay()); // Sunday
-              document.getElementById("start").value = start.toISOString().split("T")[0];
-              document.getElementById("end").value = today.toISOString().split("T")[0];
-              document.querySelector("form").submit();
-            }
-
-            function setYesterday() {
-              const y = new Date();
-              y.setDate(y.getDate() - 1);
-              const yStr = y.toISOString().split("T")[0];
-              document.getElementById("start").value = yStr;
-              document.getElementById("end").value = yStr;
-              document.querySelector("form").submit();
-            }
-
-            function setThisMonth() {
-              const today = new Date();
-              const start = new Date(today.getFullYear(), today.getMonth(), 1);
-              document.getElementById("start").value = start.toISOString().split("T")[0];
-              document.getElementById("end").value = today.toISOString().split("T")[0];
-              document.querySelector("form").submit();
-            }
-
-            function setThisYear() {
-              const today = new Date();
-              const start = new Date(today.getFullYear(), 0, 1);
-              document.getElementById("start").value = start.toISOString().split("T")[0];
-              document.getElementById("end").value = today.toISOString().split("T")[0];
-              document.querySelector("form").submit();
-            }
-
-            function setThisQuarter() {
-              const today = new Date();
-              const quarter = Math.floor(today.getMonth() / 3);
-              const startMonth = quarter * 3;
-              const start = new Date(today.getFullYear(), startMonth, 1);
-              document.getElementById("start").value = start.toISOString().split("T")[0];
-              document.getElementById("end").value = today.toISOString().split("T")[0];
-              document.querySelector("form").submit();
-            }
-
-      document.getElementById('filterType').addEventListener('change', function () {
-          const filter = this.value;
-          const rows = document.querySelectorAll('.update-row');
-
-          rows.forEach(row => {
-            const type = row.dataset.type;
-            row.style.display = (filter === 'all' || filter === type) ? '' : 'none';
-          });
+          }
         });
+      }
+
+      renderChart("passesChart", passesData, "New Passes");
+      renderChart("visitsChart", visitsData, "Visits");
+
+      function setThisWeek() {
+        const today = new Date();
+        const start = new Date();
+        start.setDate(today.getDate() - today.getDay()); // Sunday
+        document.getElementById("start").value = start.toISOString().split("T")[0];
+        document.getElementById("end").value = today.toISOString().split("T")[0];
+        document.querySelector("form").submit();
+      }
+
+      function setYesterday() {
+        const y = new Date();
+        y.setDate(y.getDate() - 1);
+        const yStr = y.toISOString().split("T")[0];
+        document.getElementById("start").value = yStr;
+        document.getElementById("end").value = yStr;
+        document.querySelector("form").submit();
+      }
+
+      function setThisMonth() {
+        const today = new Date();
+        const start = new Date(today.getFullYear(), today.getMonth(), 1);
+        document.getElementById("start").value = start.toISOString().split("T")[0];
+        document.getElementById("end").value = today.toISOString().split("T")[0];
+        document.querySelector("form").submit();
+      }
+
+      function setThisYear() {
+        const today = new Date();
+        const start = new Date(today.getFullYear(), 0, 1);
+        document.getElementById("start").value = start.toISOString().split("T")[0];
+        document.getElementById("end").value = today.toISOString().split("T")[0];
+        document.querySelector("form").submit();
+      }
+
+      function setThisQuarter() {
+        const today = new Date();
+        const quarter = Math.floor(today.getMonth() / 3);
+        const startMonth = quarter * 3;
+        const start = new Date(today.getFullYear(), startMonth, 1);
+        document.getElementById("start").value = start.toISOString().split("T")[0];
+        document.getElementById("end").value = today.toISOString().split("T")[0];
+        document.querySelector("form").submit();
+      }
     </script>
   </body>
 </html>
