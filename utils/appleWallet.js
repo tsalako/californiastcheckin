@@ -380,6 +380,9 @@ async function sendPushUpdateByEmail(email) {
   const results = [];
   for (const { pushToken } of devices) {
     const result = await provider.send(note, pushToken);
+    console.log("sent:", result.sent.length);
+    console.log("failed:", result.failed.length);
+    console.log(result.failed);
     results.push(result);
   }
 
