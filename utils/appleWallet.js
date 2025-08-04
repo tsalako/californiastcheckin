@@ -287,7 +287,7 @@ async function getUpdatedSerialNumbers(deviceLibraryIdentifier, updatedSince) {
   if (updatesSince.length == 0) throw new Error("nothing found");
 
   const serials = updatesSince.map((e) => e.serialNumber);
-  const lastUpdate = updatesSince[updatesSince.length - 1].nowMillis.toString();
+  const lastUpdate = updatesSince[updatesSince.length - 1].updateTime.toString();
 
   return {
     serialNumbers: serials,
