@@ -266,7 +266,8 @@ async function registerDevice(
 
 async function getUpdatedSerialNumbers(deviceLibraryIdentifier, updatedSince) {
   console.log("getUpdatedSerialNumbers");
-  const { updatesFile } = getObjectInfoFromSN(serialNumber);
+  // this is a hack, it should be removed.
+  const { updatesFile } = getObjectInfoFromSN("");
 
   console.time("updates");
   const updates = await readJsonFromGCS(updatesFile).catch(() => ({}));

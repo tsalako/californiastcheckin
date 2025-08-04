@@ -125,6 +125,8 @@ app.post(
     console.time("registerDevice");
     const { deviceLibraryIdentifier, serialNumber } = req.params;
     const pushToken = req.body.pushToken;
+    const authHeader = req.headers.authorization;
+    console.log(`authHeader = ${authHeader}`);
     const newlyRegistered = await registerDevice(
       serialNumber,
       deviceLibraryIdentifier,
