@@ -4,6 +4,8 @@ const jwt = require("jsonwebtoken");
 const { formatInTimeZone } = require("date-fns-tz");
 const { Storage } = require("@google-cloud/storage");
 
+const { getLevelDetails } = require("./levelConfig.js");
+
 const issuerId = process.env.GOOGLE_WALLET_ISSUER_ID;
 const ENVIRONMENT = process.env.NODE_ENV || "development";
 const isProduction = ENVIRONMENT === "production";
@@ -106,13 +108,14 @@ async function createGooglePass(email, name) {
   entry.isUpdate = false;
   updates.push(entry);
 
-    console.time("write updates and metadata");
+  console.time("write updates and metadata");
   await Promise.all([
     writeJsonToGCS(metaFile, metadata),
     writeJsonToGCS(updatesFile, updates),
   ]);
   console.timeEnd("write updates and metadata");
 
+  const level = getLevelDetails(visitTimestamps.length);
   const loyaltyObject = {
     accountName: name,
     loyaltyPoints: {
@@ -127,7 +130,7 @@ async function createGooglePass(email, name) {
     classId,
     state: "ACTIVE",
     smartTapRedemptionValue: email,
-    // textModulesData: [{ id: 'og_status', header: 'OG Status', body: '👑' }],
+    textModulesData: [{ id: 'level', header: 'Level', body: level.name }],
     passConstraints: { nfcConstraint: ["BLOCK_PAYMENT"] },
   };
 
@@ -187,16 +190,18 @@ async function updatePassObject(email, name) {
   entry.isUpdate = true;
   updates.push(entry);
 
-    console.time("write updates and metadata");
+  console.time("write updates and metadata");
   await Promise.all([
     writeJsonToGCS(metaFile, metadata),
     writeJsonToGCS(updatesFile, updates),
   ]);
   console.timeEnd("write updates and metadata");
 
+  const level = getLevelDetails(visitTimestamps.length);
   const patchBody = {
     loyaltyPoints: { balance: { int: visitTimestamps.length } },
     secondaryLoyaltyPoints: { balance: { string: nowFormatted } },
+    textModulesData: [{ id: 'level', header: 'Level', body: level.name }],
   };
 
   console.time("patchPass");
@@ -221,8 +226,7 @@ async function createPassClass() {
       },
     },
     accountNameLabel: "Dreamer Name",
-    rewardsTierLabel: "Level",
-    rewardsTier: "Snoozer",
+    // TODO: update class pass
     id: classId,
     issuerName: "CSD Pass",
     reviewStatus: "UNDER_REVIEW",

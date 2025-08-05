@@ -5,6 +5,8 @@ const { formatInTimeZone } = require("date-fns-tz");
 const crypto = require("crypto");
 const apn = require("apn");
 
+const { getLevelDetails } = require("./levelConfig.js");
+
 const BUCKET_NAME = process.env.GCS_BUCKET_NAME;
 const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
 const storage = new Storage({ credentials });
@@ -166,6 +168,7 @@ async function createApplePass(email, name, isUpdate = false) {
   );
   console.timeEnd("generate pass");
 
+  const level = getLevelDetails(visitTimestamps.length);
   pass.auxiliaryFields.push(
     {
       key: "visits",
@@ -176,7 +179,7 @@ async function createApplePass(email, name, isUpdate = false) {
   );
   pass.backFields.push(
     { key: "name_back", label: "Dreamer Name", value: name },
-    { key: "level_back", label: "Level", value: "Snoozer" },
+    { key: "level_back", label: "Level", value: level.name },
     {
       key: "visits_back",
       label: "Visits",
