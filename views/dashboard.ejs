@@ -12,7 +12,7 @@
       <h1 class="text-3xl font-bold">📈 Analytics Dashboard</h1>
 
       <!-- Date Range Filter -->
-      <form class="flex flex-wrap gap-4 mb-6 items-end" method="GET">
+      <form method="GET" class="flex flex-wrap gap-4 mb-6 items-end">
         <div>
           <label class="block text-sm font-medium text-gray-700" for="start"
             >Start Date</label
@@ -40,42 +40,39 @@
         <button class="bg-blue-500 text-white px-4 py-2 rounded" type="submit">
           Apply
         </button>
+
+        <!-- Range buttons use ?range=... for server-side logic -->
         <div class="flex flex-wrap gap-2">
-          <button
+          <a
             class="bg-gray-400 text-white px-4 py-2 rounded"
-            type="button"
-            onclick="setYesterday()"
+            href="/dashboard?range=today"
+            >Today</a
           >
-            Yesterday
-          </button>
-          <button
+          <a
             class="bg-gray-400 text-white px-4 py-2 rounded"
-            type="button"
-            onclick="setThisWeek()"
+            href="/dashboard?range=yesterday"
+            >Yesterday</a
           >
-            This Week
-          </button>
-          <button
+          <a
             class="bg-gray-400 text-white px-4 py-2 rounded"
-            type="button"
-            onclick="setThisMonth()"
+            href="/dashboard?range=thisWeek"
+            >This Week</a
           >
-            This Month
-          </button>
-          <button
+          <a
             class="bg-gray-400 text-white px-4 py-2 rounded"
-            type="button"
-            onclick="setThisQuarter()"
+            href="/dashboard?range=thisMonth"
+            >This Month</a
           >
-            This Quarter
-          </button>
-          <button
+          <a
             class="bg-gray-400 text-white px-4 py-2 rounded"
-            type="button"
-            onclick="setThisYear()"
+            href="/dashboard?range=thisQuarter"
+            >This Quarter</a
           >
-            This Year
-          </button>
+          <a
+            class="bg-gray-400 text-white px-4 py-2 rounded"
+            href="/dashboard?range=thisYear"
+            >This Year</a
+          >
         </div>
       </form>
 
@@ -136,12 +133,7 @@
                 <% updateLog.forEach(row => { %>
                 <tr class="border-t">
                   <td class="p-3"><%= row.name %></td>
-                  <td class="p-3">
-                    <%= new Date(row.updateTime).toLocaleString('en-US', {
-                    timeZone: 'America/Los_Angeles', weekday: 'short', month:
-                    'short', day: 'numeric', year: 'numeric', hour: 'numeric',
-                    minute: '2-digit', hour12: true }) %>
-                  </td>
+                  <td class="p-3"><%= row.updateTime %></td>
                   <td class="p-3">
                     <%= row.isUpdate ? 'Visited' : 'Created' %>
                   </td>
