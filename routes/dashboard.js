@@ -1,6 +1,6 @@
 const express = require("express");
 const { Storage } = require("@google-cloud/storage");
-const { eachDayOfInterval, format } = require('date-fns');
+const { eachDayOfInterval, format } = require("date-fns");
 const router = express.Router();
 
 const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
@@ -20,15 +20,15 @@ const PST = "America/Los_Angeles";
 
 function formatPSTDateTimeString(timestamp) {
   const date = new Date(timestamp);
-  return new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Los_Angeles',
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
   }).format(date);
 }
 
@@ -41,18 +41,18 @@ function parseDateAsPST(dateStr) {
 }
 
 function getPSTCalendarParts(date = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Los_Angeles',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
   }).formatToParts(date);
 
-  const map = Object.fromEntries(parts.map(p => [p.type, p.value]));
+  const map = Object.fromEntries(parts.map((p) => [p.type, p.value]));
   return {
     year: parseInt(map.year),
     month: parseInt(map.month),
-    day: parseInt(map.day)
+    day: parseInt(map.day),
   };
 }
 
@@ -87,11 +87,14 @@ function getDefaultRange(range) {
       return [null, null];
   }
 
-  return [formatDate(start), formatDate(new Date(Date.UTC(year, month - 1, day)))];
+  return [
+    formatDate(start),
+    formatDate(new Date(Date.UTC(year, month - 1, day))),
+  ];
 }
 
 function formatDate(date) {
-  return date.toISOString().split('T')[0]; // yyyy-mm-dd
+  return date.toISOString().split("T")[0]; // yyyy-mm-dd
 }
 
 function isWithinDateRange(dateStr, startDate, endDate) {
@@ -106,8 +109,8 @@ function getChartLabelsForRange(startStr, endStr) {
   const start = parseDateAsPST(startStr);
   const end = parseDateAsPST(endStr);
 
-  return eachDayOfInterval({ start, end }).map(date =>
-    format(date, 'yyyy-MM-dd')
+  return eachDayOfInterval({ start, end }).map((date) =>
+    format(date, "yyyy-MM-dd")
   );
 }
 
@@ -153,8 +156,14 @@ router.get("/dashboard", async (req, res) => {
           userStats.push({ name, visits });
 
           (meta.visitTimestamps || []).forEach((ts) => {
-            const day = new Date(ts).toLocaleDateString("en-CA");
-            console.log(`timestamp=${new Date(ts)}, convertedDate=${day}, start=${start}, end=${end}`);
+            const day = new Date(ts).toLocaleDateString("en-CA", {
+              timeZone: "America/Los_Angeles",
+            });
+            console.log(
+              `timestamp=${new Date(
+                ts
+              )}, convertedDate=${day}, start=${start}, end=${end}`
+            );
             if (isWithinDateRange(day, start, end)) {
               visitsPerDay[day] = (visitsPerDay[day] || 0) + 1;
             }
@@ -162,7 +171,9 @@ router.get("/dashboard", async (req, res) => {
 
           const created = meta.createTime || (meta.visitTimestamps || [])[0];
           if (created) {
-            const day = new Date(created).toLocaleDateString("en-CA");
+            const day = new Date(created).toLocaleDateString("en-CA", {
+              timeZone: "America/Los_Angeles",
+            });
             if (isWithinDateRange(day, start, end)) {
               passesPerDay[day] = (passesPerDay[day] || 0) + 1;
             }
