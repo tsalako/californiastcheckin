@@ -159,11 +159,6 @@ router.get("/dashboard", async (req, res) => {
             const day = new Date(ts).toLocaleDateString("en-CA", {
               timeZone: "America/Los_Angeles",
             });
-            console.log(
-              `timestamp=${new Date(
-                ts
-              )}, convertedDate=${day}, start=${start}, end=${end}`
-            );
             if (isWithinDateRange(day, start, end)) {
               visitsPerDay[day] = (visitsPerDay[day] || 0) + 1;
             }
@@ -183,16 +178,16 @@ router.get("/dashboard", async (req, res) => {
         }
       })
   );
-  console.log("finished building list");
-  // const labels = getChartLabelsForRange(start, end);
 
-  // visitsPerDay = Object.fromEntries(
-  //   labels.map(date => [date, visitsPerDay[date] || 0])
-  // );
+  const labels = getChartLabelsForRange(start, end);
 
-  // passesPerDay = Object.fromEntries(
-  //   labels.map(date => [date, passesPerDay[date] || 0])
-  // );
+  visitsPerDay = Object.fromEntries(
+    labels.map(date => [date, visitsPerDay[date] || 0])
+  );
+
+  passesPerDay = Object.fromEntries(
+    labels.map(date => [date, passesPerDay[date] || 0])
+  );
 
   userStats.sort((a, b) => b.visits - a.visits);
   updates.sort((a, b) => new Date(b.updateTime) - new Date(a.updateTime));
