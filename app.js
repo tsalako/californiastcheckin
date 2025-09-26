@@ -49,14 +49,14 @@ app.get("/healthz", (req, res) => {
 
 // Ping /healthz every 14 minutes to prevent sleeping
 setInterval(() => {
-  const pstHour = new Date().toLocaleString("en-US", {
-    timeZone: "America/Los_Angeles",
-  });
-  const hour = new Date(pstHour).getHours();
-  if (hour >= 1 && hour < 9) {
-    console.log("[healthz] Skipped ping (quiet hours)");
-    return;
-  }
+  // const pstHour = new Date().toLocaleString("en-US", {
+  //   timeZone: "America/Los_Angeles",
+  // });
+  // const hour = new Date(pstHour).getHours();
+  // if (hour >= 1 && hour < 9) {
+  //   console.log("[healthz] Skipped ping (quiet hours)");
+  //   return;
+  // }
 
   fetch("https://californiastcheckin.onrender.com/healthz")
     .then((res) => console.log(`[healthz] Ping success: ${res.status}`))
