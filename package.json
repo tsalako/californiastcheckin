@@ -21,6 +21,7 @@
     "prisma": "^5.19.1"
   },
   "scripts": {
+    "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy"
   }
