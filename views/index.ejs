@@ -93,6 +93,20 @@
           </div>
         </div>
 
+        <!-- Companions (revealed after a successful record) -->
+        <div id="companionsWrapper" class="slot-item hidden">
+          <div class="manual-signin-wrapper">
+            <form id="companionsForm" class="manual-signin-form">
+              <label class="font-medium">Bringing friends today?</label>
+              <div class="form-row">
+                <input type="number" id="companionsCount" min="1" value="1" class="text-input" />
+                <button type="submit" class="button">Add Companions</button>
+              </div>
+              <p id="companionsMsg" class="text-muted" style="margin-top:.5rem;"></p>
+            </form>
+          </div>
+        </div>
+
         <!-- Feedback + Wallet -->
         <div class="stack-slot">
           <div class="slot-item visible">
@@ -117,43 +131,33 @@
       const recordVisit = document.getElementById("recordVisit");
       const createPassSubmit = document.getElementById("createPassSubmit");
 
+      // Will be set by /hasPass or /record-visit JSON
+      window.__USER_ID__ = window.__USER_ID__ || null;
+
       function handleSignedInState(email, name) {
         userEmail = email;
         fullName = name;
 
-        document.cookie = `userEmail=${encodeURIComponent(email)}; max-age=${
-          60 * 60 * 24 * 366
-        }`;
-        document.cookie = `name=${encodeURIComponent(name)}; max-age=${
-          60 * 60 * 24 * 366
-        }`;
+        document.cookie = `userEmail=${encodeURIComponent(email)}; max-age=${60 * 60 * 24 * 366}`;
+        document.cookie = `name=${encodeURIComponent(name)}; max-age=${60 * 60 * 24 * 366}`;
 
         hasPassCheck(email, name);
       }
 
       function hasPassCheck(email, name) {
-        document
-          .getElementById("signinWrapper")
-          .classList.replace("visible", "hidden");
-        document
-          .getElementById("signedInWrapper")
-          .classList.replace("hidden", "visible");
+        document.getElementById("signinWrapper").classList.replace("visible", "hidden");
+        document.getElementById("signedInWrapper").classList.replace("hidden", "visible");
         document.getElementById("signedInAs").textContent = name;
 
-        fetch(
-          `/hasPass?email=${encodeURIComponent(email)}&platform=${platform}`
-        )
+        fetch(`/hasPass?email=${encodeURIComponent(email)}&platform=${platform}`)
           .then((res) => res.json())
           .then(({ exists }) => {
+            // window.__USER_ID__ = userId || window.__USER_ID__;
             if (exists) {
-              document
-                .getElementById("recordWrapper")
-                .classList.replace("hidden", "visible");
+              document.getElementById("recordWrapper").classList.replace("hidden", "visible");
               if (window.AUTO_VISIT_RECORDING) recordVisit.click();
             } else {
-              document
-                .getElementById("createWrapper")
-                .classList.replace("hidden", "visible");
+              document.getElementById("createWrapper").classList.replace("hidden", "visible");
               if (window.AUTO_PASS_CREATION) createPassSubmit.click();
             }
           });
@@ -164,40 +168,26 @@
         handleSignedInState(payload.email, payload.name);
       }
 
-      document
-        .getElementById("altSignInToggle")
-        .addEventListener("click", () => {
-          document
-            .getElementById("signinWrapper")
-            .classList.replace("visible", "hidden");
-          document
-            .getElementById("manualSignInWrapper")
-            .classList.replace("hidden", "visible");
-        });
-
-      document.getElementById("backToGoogle").addEventListener("click", () => {
-        document
-          .getElementById("manualSignInWrapper")
-          .classList.replace("visible", "hidden");
-        document
-          .getElementById("signinWrapper")
-          .classList.replace("hidden", "visible");
+      document.getElementById("altSignInToggle").addEventListener("click", () => {
+        document.getElementById("signinWrapper").classList.replace("visible", "hidden");
+        document.getElementById("manualSignInWrapper").classList.replace("hidden", "visible");
       });
 
-      document
-        .getElementById("manualSignInForm")
-        .addEventListener("submit", (e) => {
-          e.preventDefault();
-          const first = document.getElementById("firstName").value.trim();
-          const last = document.getElementById("lastName").value.trim();
-          const email = document.getElementById("emailManual").value.trim();
-          if (!first || !last || !email) return;
-          document
-            .getElementById("manualSignInWrapper")
-            .classList.replace("visible", "hidden");
-          const name = `${first} ${last}`;
-          handleSignedInState(email, name);
-        });
+      document.getElementById("backToGoogle").addEventListener("click", () => {
+        document.getElementById("manualSignInWrapper").classList.replace("visible", "hidden");
+        document.getElementById("signinWrapper").classList.replace("hidden", "visible");
+      });
+
+      document.getElementById("manualSignInForm").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const first = document.getElementById("firstName").value.trim();
+        const last = document.getElementById("lastName").value.trim();
+        const email = document.getElementById("emailManual").value.trim();
+        if (!first || !last || !email) return;
+        document.getElementById("manualSignInWrapper").classList.replace("visible", "hidden");
+        const name = `${first} ${last}`;
+        handleSignedInState(email, name);
+      });
 
       window.addEventListener("DOMContentLoaded", () => {
         const signinWrapper = document.getElementById("signinWrapper");
@@ -232,26 +222,19 @@
         const res = await fetch(`/create-pass`, {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: `name=${encodeURIComponent(name)}&email=${encodeURIComponent(
-            email
-          )}&platform=${platform}`,
+          body: `name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&platform=${platform}`,
         });
 
         if (res.ok) {
           const data = await res.json();
+          // window.__USER_ID__ = data.userId || window.__USER_ID__;
           createPassSubmit.textContent = "Created";
           const a = document.createElement("a");
           a.href = platform === "apple" ? data.url : data.button;
 
           const img = new Image();
-          img.src =
-            platform === "apple"
-              ? "apple-wallet-button.svg"
-              : "google-wallet-button.png";
-          img.alt =
-            platform === "apple"
-              ? "Save to Apple Wallet"
-              : "Save to Google Wallet";
+          img.src = platform === "apple" ? "apple-wallet-button.svg" : "google-wallet-button.png";
+          img.alt = platform === "apple" ? "Save to Apple Wallet" : "Save to Google Wallet";
           img.style.height = "50px";
           img.style.width = "auto";
 
@@ -264,8 +247,7 @@
           };
 
           img.onerror = () => {
-            a.textContent =
-              platform === "apple" ? "Download Pass" : "Save to Wallet";
+            a.textContent = platform === "apple" ? "Download Pass" : "Save to Wallet";
             container.innerHTML = "";
             container.appendChild(a);
             container.classList.add("show");
@@ -290,21 +272,20 @@
         const res = await fetch("/record-visit", {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: `name=${encodeURIComponent(name)}&email=${encodeURIComponent(
-            email
-          )}&platform=${platform}`,
+          body: `name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&platform=${platform}`,
         });
 
+        const data = await res.json().catch(() => ({}));
         if (res.ok) {
           recordVisit.textContent = "Recorded!";
-          const data = await res.json();
+  
+          // Apple: show update (or push) if applicable
           if (platform === "apple") {
             if (window.UPDATE_APPLE_WALLET && data.hasRegisteredDevice) {
               try {
                 await fetch(`/push-update?email=${encodeURIComponent(email)}`);
               } catch (err) {
-                feedbackEl.textContent =
-                  err.message || "⚠️ Failed to record visit.";
+                feedbackEl.textContent = err.message || "⚠️ Failed to record visit.";
                 feedbackEl.classList.add("show");
                 recordVisit.textContent = "Record Visit";
                 recordVisit.disabled = false;
@@ -334,17 +315,46 @@
                 container.innerHTML = "";
                 container.appendChild(a);
                 container.classList.add("show");
-                if (window.AUTO_CLICK_RECORDING_LINKS) a.click(); // fallback in case image fails
+                if (window.AUTO_CLICK_RECORDING_LINKS) a.click();
               };
             }
           }
         } else {
-          const data = await res.json().catch(() => ({}));
           feedbackEl.textContent = data.message || "⚠️ Failed to record visit.";
           feedbackEl.classList.add("show");
           recordVisit.textContent = "Record Visit";
           recordVisit.disabled = false;
         }
+
+        // Reveal companions UI (server enforces once-per-day)
+        try {
+          const compWrap = document.getElementById("companionsWrapper");
+          const compForm = document.getElementById("companionsForm");
+          const compMsg  = document.getElementById("companionsMsg");
+          if (compWrap && compForm) {
+            compWrap.classList.replace("hidden","visible");
+            compMsg.textContent = "Add the number of friends you brought today (once per day).";
+
+            compForm.onsubmit = async (e) => {
+              console.log("submit form");
+              e.preventDefault();
+              const n = Math.max(1, Number(document.getElementById("companionsCount").value)||1);
+              const r = await fetch("/checkin/companions", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                // body: "primaryUserId=" + encodeURIComponent((window.__USER_ID__||\"\")) + "&count=" + n"
+                body: `primaryUserId=${encodeURIComponent(data.userId)}&count=${n}`
+              });
+              if (r.ok) {
+                const data = await r.json();
+                compMsg.textContent = data.message;
+              } else {
+                const d = await r.json().catch(()=>({}));
+                compMsg.textContent = (d.message || "Could not add companions (maybe already added today).");
+              }
+            };
+          }
+        } catch (_e) { /* non-blocking */ }
 
         setTimeout(() => feedbackEl.classList.remove("show"), 3000);
       });

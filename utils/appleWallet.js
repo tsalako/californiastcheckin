@@ -6,19 +6,30 @@ const crypto = require("crypto");
 const apn = require("apn");
 
 const { getLevelDetails } = require("./levelConfig.js");
+const {
+  getOrCreateUserByEmail,
+  attachWalletIds,
+} = require("../services/users");
+const {
+  visitsCount,
+  alreadyCheckedInToday,
+  recordVisit,
+} = require("../services/checkins");
+const {
+  upsertAppleDevice,
+  unregisterAppleDevice,
+  getUserDevices,
+} = require("../services/devices");
+
+const { isProd } = require("../utils/env");
+const { prisma } = require("../utils/db");
 
 const BUCKET_NAME = process.env.GCS_BUCKET_NAME;
 const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
 const storage = new Storage({ credentials });
 
-const metaDir = "meta";
 const certDir = "apple";
 const passOutputDir = "apple/passes";
-
-const ENVIRONMENT = process.env.NODE_ENV || "development";
-const isProduction = ENVIRONMENT === "production";
-const ENV_SUFFIX = isProduction ? "" : "_staging";
-const visitThrottleEnabled = isProduction;
 
 function generateAuthToken() {
   return crypto.randomBytes(16).toString("hex"); // 32-char token
@@ -33,8 +44,6 @@ function getObjectInfoFromSN(serialNumber) {
   return {
     serialNumber,
     passFile: `${passOutputDir}/${serialNumber}.pkpass`,
-    metaFile: `${metaDir}/${serialNumber}.json`,
-    updatesFile: `updates${ENV_SUFFIX}.json`,
   };
 }
 
@@ -68,89 +77,59 @@ async function getCertFiles() {
   return cachedCerts;
 }
 
-function areSameDayPST(ms1, ms2) {
-  const date1 = new Date(ms1);
-  const date2 = new Date(ms2);
-
-  // Create DateTimeFormat objects for "America/Los_Angeles" (PST/PDT)
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "numeric",
-    day: "numeric",
-    timeZone: "America/Los_Angeles",
-  });
-
-  // Extract the formatted date strings for comparison
-  const formattedDate1 = formatter.format(date1);
-  const formattedDate2 = formatter.format(date2);
-
-  return formattedDate1 === formattedDate2;
+async function hasApplePass(email) {
+  const { passFile } = getObjectInfo(email);
+  const [exists] = await storage.bucket(BUCKET_NAME).file(passFile).exists();
+  return exists;
 }
 
-async function createApplePass(email, name, isUpdate = false) {
+async function createApplePass(email, name, isUpdate) {
   console.log(`createApplePass - isUpdate: ${isUpdate}`);
 
-  const { serialNumber, passFile, metaFile, updatesFile } =
-    getObjectInfo(email);
+  const { serialNumber, passFile } = getObjectInfo(email);
 
-  console.time("certs and metadata");
-  const [{ cert, key, wwdr }, updates, metadata] = await Promise.all([
-    getCertFiles(),
-    readJsonFromGCS(updatesFile).catch(() => []),
-    readJsonFromGCS(metaFile).catch(() => ({})),
-  ]);
-  console.timeEnd("certs and metadata");
+  console.time("certs");
+  const { cert, key, wwdr } = await getCertFiles();
+  console.timeEnd("certs");
 
-  const now = new Date();
-  const nowFormatted = formatInTimeZone(now, "America/Los_Angeles", "iii PP p");
-  const nowMillis = now.getTime();
+  let user = await getOrCreateUserByEmail(email, name);
+  var userId = user.id;
 
-  const visitTimestamps = Array.isArray(metadata.visitTimestamps)
-    ? metadata.visitTimestamps
-    : [];
-  const lastTimestamp = visitTimestamps[visitTimestamps.length - 1] || 0;
-
-  if (
-    visitThrottleEnabled &&
-    !isNaN(lastTimestamp) &&
-    areSameDayPST(nowMillis, lastTimestamp)
-  ) {
+  if (isProd() && (await alreadyCheckedInToday(userId))) {
     console.log(`${name} attempted to check in more than once.`);
     throw new Error("You've already checked in today.");
   }
-  visitTimestamps.push(nowMillis);
 
-  metadata.visitTimestamps = visitTimestamps;
+  console.time("record visit");
+  const visit = await recordVisit({ userId: userId });
+  console.timeEnd("record visit");
+
+  const nowFormatted = formatInTimeZone(
+    visit.occurredAt,
+    "America/Los_Angeles",
+    "iii PP p"
+  );
+
   if (!isUpdate) {
-    metadata.name = name;
-    metadata.email = email;
-    metadata.createTime = nowMillis;
-    metadata.serialNumber = serialNumber;
-    metadata.authenticationToken = generateAuthToken();
-    metadata.passTypeIdentifier = process.env.APPLE_PASS_TYPE_IDENTIFIER;
-    metadata.teamIdentifier = process.env.APPLE_TEAM_ID;
+    console.time("attach wallet ids");
+    user = await attachWalletIds(userId, {
+      serialNumber: serialNumber,
+      authenticationToken: generateAuthToken(),
+      passTypeIdentifier: process.env.APPLE_PASS_TYPE_IDENTIFIER,
+      teamIdentifier: process.env.APPLE_TEAM_ID,
+    });
+    console.timeEnd("attach wallet ids");
   }
 
-  // Maybe back fill metadata so this code can be deleted.
-  if (!metadata.name) metadata.name = name;
-  if (!metadata.email) metadata.email = email;
-  if (!metadata.authenticationToken)
-    metadata.authenticationToken = generateAuthToken();
-  if (!metadata.passTypeIdentifier)
-    metadata.passTypeIdentifier = process.env.APPLE_PASS_TYPE_IDENTIFIER;
-  if (!metadata.teamIdentifier)
-    metadata.teamIdentifier = process.env.APPLE_TEAM_ID;
-  if(!metadata.createTime) metadata.createTime = nowMillis;
-
-  const entry = {};
-  entry.name = name;
-  entry.serialNumber = serialNumber;
-  entry.updateTime = nowMillis;
-  entry.isUpdate = isUpdate;
-  entry.devices = metadata.devices || []; // may not work depending on when the device is registered.
-  updates.push(entry);
-
-  const hasRegisteredDevice = metadata.devices != null;
+  const metadata = {
+    name: user.name,
+    email: user.email,
+    createTime: user.createdAt,
+    serialNumber: user.serialNumber,
+    authenticationToken: user.authenticationToken,
+    passTypeIdentifier: user.passTypeIdentifier,
+    teamIdentifier: user.teamIdentifier,
+  };
 
   // TODO: get images from GCS instead of locally.
   console.time("generate pass");
@@ -168,12 +147,16 @@ async function createApplePass(email, name, isUpdate = false) {
   );
   console.timeEnd("generate pass");
 
-  const level = getLevelDetails(visitTimestamps.length);
+  console.time("get visits");
+  const countNow = await visitsCount(userId);
+  const level = getLevelDetails(countNow);
+  console.timeEnd("get visits");
+
   pass.auxiliaryFields.push(
     {
       key: "visits",
       label: "Visits",
-      value: visitTimestamps.length.toString(),
+      value: countNow,
     },
     { key: "lastvisit", label: "Last Visit", value: nowFormatted }
   );
@@ -183,7 +166,7 @@ async function createApplePass(email, name, isUpdate = false) {
     {
       key: "visits_back",
       label: "Visits",
-      value: visitTimestamps.length.toString(),
+      value: countNow,
     },
     { key: "lastvisit_back", label: "Last Visit", value: nowFormatted }
   );
@@ -198,24 +181,11 @@ async function createApplePass(email, name, isUpdate = false) {
     resumable: false,
   });
 
-  console.time("write pass, metadata, and updates to GCS");
-  await Promise.all([
-    new Promise((resolve, reject) => {
-      streamBuffer.pipe(uploadStream).on("error", reject).on("finish", resolve);
-    }),
-    storage.bucket(BUCKET_NAME).file(metaFile).save(JSON.stringify(metadata), {
-      contentType: "application/json",
-      resumable: false,
-    }),
-    storage
-      .bucket(BUCKET_NAME)
-      .file(updatesFile)
-      .save(JSON.stringify(updates), {
-        contentType: "application/json",
-        resumable: false,
-      }),
-  ]);
-  console.timeEnd("write pass, metadata, and updates to GCS");
+  console.time("write pass to GCS");
+  await new Promise((resolve, reject) => {
+    streamBuffer.pipe(uploadStream).on("error", reject).on("finish", resolve);
+  });
+  console.timeEnd("write pass to GCS");
 
   console.time("getSignedUrl");
   const [url] = await file.getSignedUrl({
@@ -225,13 +195,12 @@ async function createApplePass(email, name, isUpdate = false) {
   });
   console.timeEnd("getSignedUrl");
 
-  return { url, hasRegisteredDevice };
-}
+  console.time("getUserDevices");
+  const devices = await getUserDevices(userId);
+  const hasRegisteredDevice = devices && devices.length > 0;
+  console.timeEnd("getUserDevices");
 
-async function hasApplePass(email) {
-  const { passFile } = getObjectInfo(email);
-  const [exists] = await storage.bucket(BUCKET_NAME).file(passFile).exists();
-  return exists;
+  return { url, hasRegisteredDevice, userId };
 }
 
 async function registerDevice(
@@ -240,139 +209,128 @@ async function registerDevice(
   pushToken
 ) {
   console.log(
-    `registerDevice: ${serialNumber}, ${deviceLibraryIdentifier}, ${pushToken}`
+    "registerDevice. serialNumber " +
+      serialNumber +
+      ", deviceLibraryIdentifier " +
+      deviceLibraryIdentifier +
+      ", pushToken" +
+      pushToken
   );
-  const { metaFile } = getObjectInfoFromSN(serialNumber);
-
-  console.time("metadata");
-  const metadata = await readJsonFromGCS(metaFile).catch(() => ({}));
-  console.timeEnd("metadata");
-
-  if (!metadata.devices) metadata.devices = [];
-
-  const alreadyRegistered = metadata.devices.some(
-    (d) => d.deviceLibraryIdentifier === deviceLibraryIdentifier
-  );
-
-  if (alreadyRegistered) {
+  const user = await prisma.user.findFirst({ where: { serialNumber } });
+  if (!user) {
     return false;
   }
-  metadata.devices.push({ deviceLibraryIdentifier, pushToken });
 
-  console.time("write metadata to GCS");
-  await storage
-    .bucket(BUCKET_NAME)
-    .file(metaFile)
-    .save(JSON.stringify(metadata), {
-      contentType: "application/json",
-      resumable: false,
-    });
-  console.timeEnd("write metadata to GCS");
-  return true;
+  const existing = await prisma.device.findFirst({
+    where: { deviceLibraryIdentifier: deviceLibraryIdentifier },
+  });
+
+  // Upsert/refresh push token
+  await upsertAppleDevice(user.id, deviceLibraryIdentifier, pushToken);
+
+  // Newly registered if it didn't exist before
+  console.log("existing? " + existing);
+  return !existing;
 }
 
+// DB-backed: return serials for this device that have changed since timestamp
 async function getUpdatedSerialNumbers(deviceLibraryIdentifier, updatedSince) {
-  console.log(
-    `getUpdatedSerialNumbers: ${deviceLibraryIdentifier}, ${updatedSince}`
+  console.log("getUpdatedSerialNumbers");
+  // Find the device and its user
+  const device = await prisma.device.findFirst({
+    where: { deviceLibraryIdentifier: deviceLibraryIdentifier },
+    include: { user: true },
+  });
+
+  if (!device || !device.user) {
+    throw new Error("nothing found");
+  }
+
+  const user = device.user;
+
+  // Parse "passesUpdatedSince" as ms epoch (Apple sends milliseconds since epoch)
+  const since = new Date(
+    Number.isFinite(parseInt(updatedSince, 10)) ? parseInt(updatedSince, 10) : 0
   );
-  // this is a hack, it should be removed.
-  const { updatesFile } = getObjectInfoFromSN("");
 
-  console.time("updates");
-  const updates = await readJsonFromGCS(updatesFile).catch(() => []);
-  console.timeEnd("updates");
+  // Compute most recent "update" moment that should bump the pass:
+  // - user's updatedAt (e.g., when tokens/ids change)
+  // - latest visit for this user
+  const latestVisit = await prisma.visit.findFirst({
+    where: { userId: user.id },
+    orderBy: { occurredAt: "desc" },
+    select: { occurredAt: true },
+  });
 
-  const updateSinceTime = new Date(parseInt(updatedSince, 10) || 0);
-  console.time("filter");
-  const updatesSince = updates.filter(
-    (e) =>
-      e.isUpdate &&
-      new Date(e.updateTime) > updateSinceTime &&
-      e.devices &&
-      e.devices.some(
-        (d) => d.deviceLibraryIdentifier === deviceLibraryIdentifier
-      )
-  );
-  console.timeEnd("filter");
-  if (updatesSince.length == 0) throw new Error("nothing found");
+  const candidates = [
+    user.updatedAt || user.createdAt || new Date(0),
+    latestVisit?.occurredAt || new Date(0),
+  ].map((d) => new Date(d).getTime());
 
-  const serials = updatesSince.map((e) => e.serialNumber);
-  const lastUpdate =
-    updatesSince[updatesSince.length - 1].updateTime.toString();
+  const lastUpdateTs = Math.max(...candidates);
+  const lastUpdate = new Date(lastUpdateTs);
 
+  if (lastUpdate <= since) {
+    // Nothing changed for this device since the provided timestamp
+    throw new Error("nothing found");
+  }
+
+  const serial = user.serialNumber;
+  const updateString = String(lastUpdate.getTime());
+  console.log(`Serials=${serial}, LastUpdate=${updateString}`);
   return {
-    serialNumbers: serials,
-    lastUpdated: lastUpdate,
+    serialNumbers: [serial],
+    // Apple accepts string; we’ll return epoch ms as string for monotonicity
+    lastUpdated: updateString,
   };
 }
 
 async function unregisterDevice(serialNumber, deviceLibraryIdentifier) {
-  console.log(`unregisterDevice: ${serialNumber}, ${deviceLibraryIdentifier}`);
-  const { metaFile } = getObjectInfoFromSN(serialNumber);
-
-  console.time("metadata");
-  const metadata = await readJsonFromGCS(metaFile).catch(() => ({}));
-  console.timeEnd("metadata");
-
-  if (!metadata.devices) return;
-
-  metadata.devices = metadata.devices.filter(
-    (d) => d.deviceLibraryIdentifier !== deviceLibraryIdentifier
-  );
-
-  console.time("write metadata to GCS");
-  await storage
-    .bucket(BUCKET_NAME)
-    .file(metaFile)
-    .save(JSON.stringify(metadata), {
-      contentType: "application/json",
-      resumable: false,
-    });
-  console.timeEnd("write metadata to GCS");
-
-  // i should also delete the pass at this point.
+  console.log("unregisterDevice");
+  const user = await prisma.user.findFirst({ where: { serialNumber } });
+  if (!user) return;
+  await unregisterAppleDevice(deviceLibraryIdentifier);
 }
 
+// DB-backed auth + read pkpass from GCS (you still store pass files in GCS)
 async function getUpdatedPass(serialNumber, authHeader) {
-  console.log(`getUpdatedPass: ${serialNumber}, ${authHeader}`);
-  const { passFile, metaFile } = getObjectInfoFromSN(serialNumber);
+  console.log("getUpdatedPass");
+  // Lookup user by serial and verify ApplePass auth header
+  const user = await prisma.user.findFirst({
+    where: { serialNumber },
+  });
+  if (!user) throw new Error("No user for serial");
 
-  console.time("pass and metadata");
-  const [pass, metadata] = await Promise.all([
-    storage
-      .bucket(BUCKET_NAME)
-      .file(passFile)
-      .download()
-      .catch(() => null),
-    readJsonFromGCS(metaFile).catch(() => ({})),
-  ]);
-  console.timeEnd("pass and metadata");
-
-  if (!pass) throw new Error("No updated pass found.");
-
-  if (
-    !metadata ||
-    !metadata.authenticationToken ||
-    authHeader !== `ApplePass ${metadata.authenticationToken}`
-  ) {
+  const expected = `ApplePass ${user.authenticationToken}`;
+  if (authHeader !== expected) {
     throw new Error("No authentication.");
   }
 
+  // Your pass files are generated into GCS; keep serving the latest file
+  const { passFile } = getObjectInfoFromSN(user.serialNumber);
+
+  const [pass] = await storage
+    .bucket(BUCKET_NAME)
+    .file(passFile)
+    .download()
+    .catch(() => [null]);
+
+  if (!pass) throw new Error("No updated pass found.");
   return pass;
 }
 
+// DB-backed: push to all registered Apple devices for a user by email
 async function sendPushUpdateByEmail(email) {
-  console.log(`sendPushUpdateByEmail: ${email}`);
-  const { metaFile } = getObjectInfo(email);
+  console.log("sendPushUpdateByEmail");
+  // Resolve user and all their devices
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) throw new Error("No user for email");
 
-  console.time("metadata");
-  const metadata = await readJsonFromGCS(metaFile).catch(() => ({}));
-  console.timeEnd("metadata");
-  const devices = metadata.devices;
-
+  const devices = await getUserDevices(user.id);
   if (!devices || devices.length === 0)
     throw new Error("No registered devices");
 
+  // Build APNs provider once
   const { authKey } = await getCertFiles();
   const provider = new apn.Provider({
     token: {
@@ -389,11 +347,9 @@ async function sendPushUpdateByEmail(email) {
   note.expiry = Math.floor(Date.now() / 1000) + 3600;
 
   const results = [];
-  for (const { pushToken } of devices) {
-    const result = await provider.send(note, pushToken);
-    console.log("sent:", result.sent.length);
-    console.log("failed:", result.failed.length);
-    console.log(result.failed);
+  for (const d of devices) {
+    if (!d.pushToken) continue;
+    const result = await provider.send(note, d.pushToken);
     results.push(result);
   }
 
@@ -402,8 +358,8 @@ async function sendPushUpdateByEmail(email) {
 }
 
 module.exports = {
-  createApplePass,
   hasApplePass,
+  createApplePass,
   registerDevice,
   getUpdatedSerialNumbers,
   unregisterDevice,

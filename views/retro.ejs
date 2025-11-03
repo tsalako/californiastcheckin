@@ -1,0 +1,78 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Retroactive Visits</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="p-6 max-w-2xl mx-auto">
+  <h1 class="text-2xl font-semibold mb-4">Add Retroactive Visits</h1>
+
+  <% if (typeof message !== 'undefined' && message) { %>
+    <% const color = type === 'error' ? 'bg-red-50 text-red-700'
+             : type === 'success' ? 'bg-emerald-50 text-emerald-700'
+             : 'bg-gray-100 text-gray-800'; %>
+    <div class="mb-4 p-3 rounded <%= color %>"><%= message %></div>
+  <% } %>
+
+  <form method="POST" class="space-y-4">
+    <div>
+      <label class="font-medium block">Mode</label>
+      <select name="mode" id="modeSelect" class="border p-2 rounded w-full">
+        <option value="user">Specific user (by email)</option>
+        <option value="anonymous">Anonymous (count only)</option>
+      </select>
+    </div>
+
+    <div>
+      <label class="font-medium block">User Email (optional)</label>
+      <input type="email" name="email" class="border p-2 rounded w-full" placeholder="user@example.com">
+      <p class="text-xs text-gray-500 mt-1">If the email isn’t found, we won’t create a user; we’ll record anonymously.</p>
+    </div>
+
+    <div>
+      <label class="font-medium block">Name (if creating new user or overwriting name)</label>
+      <input type="name" name="name" class="border p-2 rounded w-full" placeholder="Carmine Samuels">
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="font-medium block">Date</label>
+        <input type="date" name="date" class="border p-2 rounded w-full">
+      </div>
+      <div>
+        <label class="font-medium block">Count</label>
+        <input type="number" min="1" value="1" name="count" id="countField" class="border p-2 rounded w-full">
+      </div>
+    </div>
+
+    <div>
+      <label class="font-medium">Note</label>
+      <input name="note" class="border p-2 rounded w-full" placeholder="optional note">
+    </div>
+
+    <button class="bg-black text-white px-4 py-2 rounded">Add</button>
+  </form>
+
+  <script>
+  const modeSelect = document.getElementById('modeSelect');
+  const countField = document.getElementById('countField');
+
+  function toggleCountField() {
+    const mode = modeSelect.value;
+    if (mode === 'user') {
+      countField.disabled = true;
+      countField.value = 1;
+      countField.classList.add('bg-gray-100');
+    } else {
+      countField.disabled = false;
+      countField.classList.remove('bg-gray-100');
+    }
+  }
+
+  modeSelect.addEventListener('change', toggleCountField);
+  // initialize on page load
+  toggleCountField();
+</script>
+</body>
+</html>

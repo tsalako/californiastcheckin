@@ -1,0 +1,128 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum VisitKind {
+  self
+  retro
+  companion
+}
+
+enum Role {
+  user
+  house
+}
+
+model User {
+  id String @id @default(uuid())
+  email String @unique @db.Citext
+  name String?
+  role Role @default(user)
+
+
+  // Inline Wallet Pass fields
+  serialNumber String? @unique
+  authenticationToken String?
+  passTypeIdentifier String?
+  teamIdentifier String?
+
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+
+  // Relations
+  visits Visit[]
+  devices Device[]
+
+  raffleParticipants RaffleParticipant[]  @relation("UserToRaffleParticipants")
+  raffleWinners      RaffleWinner[]       @relation("UserToRaffleWinners")
+  guestHostLinks  GuestHost[] @relation("GHGuest")
+  hostGuestLinks  GuestHost[] @relation("GHHost")
+}
+
+model Device {
+  id  String @id @default(uuid())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+
+  deviceLibraryIdentifier String @unique
+  pushToken String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@unique([userId, deviceLibraryIdentifier])
+}
+
+model Visit {
+  id String @id @default(uuid())
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId String?
+  kind VisitKind @default(self)
+  occurredAt DateTime @default(now())
+  primaryUserId String?
+  note String?
+
+  @@index([userId, occurredAt])
+}
+
+model GuestHost {
+  id        String   @id @default(uuid())
+  guest     User     @relation("GHGuest", fields: [guestId], references: [id], onDelete: Cascade)
+  guestId   String
+  host      User     @relation("GHHost", fields: [hostId], references: [id], onDelete: Cascade)
+  hostId    String
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@unique([guestId, hostId])
+  @@index([hostId])
+  @@index([guestId])
+}
+
+model Raffle {
+  id            String   @id @default(uuid())
+  name          String
+  rangeType     String
+  start         DateTime
+  end           DateTime
+  winnersTarget Int
+  totalEntries  Int
+  createdAt     DateTime @default(now())
+  participants  RaffleParticipant[]
+  winners       RaffleWinner[]
+}
+
+model RaffleParticipant {
+  id        String  @id @default(uuid())
+  raffle    Raffle  @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  raffleId  String
+  user      User?   @relation("UserToRaffleParticipants", fields: [userId], references: [id], onDelete: SetNull)
+  userId    String?
+  name      String
+  entries   Int
+  remaining Int
+  createdAt DateTime @default(now())
+
+  @@index([raffleId])
+}
+
+model RaffleWinner {
+  id        String  @id @default(uuid())
+  raffle    Raffle  @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  raffleId  String
+  user      User?    @relation("UserToRaffleWinners", fields: [userId], references: [id], onDelete: SetNull)
+  userId    String?
+  name      String
+  drawOrder Int
+  createdAt DateTime @default(now())
+
+  @@index([raffleId])
+}

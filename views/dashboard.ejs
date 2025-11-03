@@ -12,138 +12,203 @@
       <h1 class="text-3xl font-bold">📈 Analytics Dashboard</h1>
 
       <!-- Date Range Filter -->
-      <form method="GET" class="flex flex-wrap gap-4 mb-6 items-end">
-        <div>
-          <label class="block text-sm font-medium text-gray-700" for="start"
-            >Start Date</label
-          >
-          <input
-            class="border border-gray-300 p-2 rounded"
-            type="date"
-            id="start"
-            name="start"
-            value="<%= start || '' %>"
-          />
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700" for="end"
-            >End Date</label
-          >
-          <input
-            class="border border-gray-300 p-2 rounded"
-            type="date"
-            id="end"
-            name="end"
-            value="<%= end || '' %>"
-          />
-        </div>
-        <button class="bg-blue-500 text-white px-4 py-2 rounded" type="submit">
-          Apply
-        </button>
+      <form method="GET" class="flex flex-col gap-4 mb-6">
+        <!-- New 2-part quick range: This/Last × Day/Week/Month/Quarter/Year -->
+        <div class="flex flex-wrap items-end gap-3">
+          <div class="flex items-center gap-2">
+            <label class="text-sm font-medium text-gray-700">Window</label>
+            <select name="mode" class="border border-gray-300 p-2 rounded">
+              <option value="this" <%= (mode==='this')?'selected':'' %>>This</option>
+              <option value="last" <%= (mode==='last')?'selected':'' %>>Last</option>
+            </select>
+          </div>
 
-        <!-- Range buttons use ?range=... for server-side logic -->
-        <div class="flex flex-wrap gap-2">
-          <a
-            class="bg-gray-400 text-white px-4 py-2 rounded"
-            href="/dashboard?range=today"
-            >Today</a
-          >
-          <a
-            class="bg-gray-400 text-white px-4 py-2 rounded"
-            href="/dashboard?range=yesterday"
-            >Yesterday</a
-          >
-          <a
-            class="bg-gray-400 text-white px-4 py-2 rounded"
-            href="/dashboard?range=thisWeek"
-            >This Week</a
-          >
-          <a
-            class="bg-gray-400 text-white px-4 py-2 rounded"
-            href="/dashboard?range=thisMonth"
-            >This Month</a
-          >
-          <a
-            class="bg-gray-400 text-white px-4 py-2 rounded"
-            href="/dashboard?range=thisQuarter"
-            >This Quarter</a
-          >
-          <a
-            class="bg-gray-400 text-white px-4 py-2 rounded"
-            href="/dashboard?range=thisYear"
-            >This Year</a
-          >
+          <div class="flex items-center gap-2">
+            <label class="text-sm font-medium text-gray-700">Period</label>
+            <select name="period" class="border border-gray-300 p-2 rounded">
+              <option value="day" <%= (period==='day')?'selected':'' %>>Day</option>
+              <option value="week" <%= (period==='week')?'selected':'' %>>Week</option>
+              <option value="month" <%= (period==='month')?'selected':'' %>>Month</option>
+              <option value="quarter" <%= (period==='quarter')?'selected':'' %>>Quarter</option>
+              <option value="year" <%= (period==='year')?'selected':'' %>>Year</option>
+            </select>
+          </div>
+
+          <button class="bg-blue-500 text-white px-4 py-2 rounded" type="submit">
+            Apply
+          </button>
+
+          <div class="flex items-center gap-2">
+            <button
+              type="submit"
+              name="all"
+              value="1"
+              class="bg-blue-500 text-white px-4 py-2 rounded"
+            >
+              All&nbsp;Time
+            </button>
+          </div>
+        </div>
+
+        <!-- Manual dates still supported -->
+        <div class="flex flex-wrap gap-4 items-end">
+          <div>
+            <label class="block text-sm font-medium text-gray-700" for="start">Start Date</label>
+            <input class="border border-gray-300 p-2 rounded" type="date" id="start" name="start" value="<%= start || '' %>" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700" for="end">End Date</label>
+            <input class="border border-gray-300 p-2 rounded" type="date" id="end" name="end" value="<%= end || '' %>" />
+          </div>
+          <button class="bg-blue-500 text-white px-4 py-2 rounded" type="submit">
+            Apply manual dates
+          </button>
         </div>
       </form>
 
       <!-- Leaderboard -->
       <section>
-        <h2 class="text-xl font-semibold mb-2">🏆 Leaderboard</h2>
-        <div class="overflow-x-auto">
-          <div class="overflow-y-auto max-h-96">
-            <table class="w-full text-left bg-white rounded shadow">
-              <thead class="sticky top-0 bg-gray-200 z-10">
-                <tr>
-                  <th class="p-3">Rank</th>
-                  <th class="p-3">Name</th>
-                  <th class="p-3">Visits</th>
-                </tr>
-              </thead>
-              <tbody>
-                <% leaderboard.forEach(user => { %>
-                <tr class="border-t">
-                  <td class="p-3"><%= user.rank %></td>
-                  <td class="p-3"><%= user.name %></td>
-                  <td class="p-3"><%= user.visits %></td>
-                </tr>
-                <% }) %>
-              </tbody>
-            </table>
+        <details class="bg-white rounded shadow" open>
+          <summary class="cursor-pointer select-none px-4 py-3 text-lg font-semibold flex items-center justify-between">
+            <span>🏆 Leaderboard</span>
+            <span class="text-sm text-gray-500">toggle</span>
+          </summary>
+          <div class="p-4">
+            <div class="overflow-x-auto">
+              <div class="overflow-y-auto max-h-96">
+                <table class="w-full text-left bg-white rounded shadow">
+                  <thead class="sticky top-0 bg-gray-200 z-10">
+                    <tr>
+                      <th class="p-3">Rank</th>
+                      <th class="p-3">Name</th>
+                      <th class="p-3">Visits</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% leaderboard.forEach(user => { %>
+                    <tr class="border-t">
+                      <td class="p-3"><%= user.rank %></td>
+                      <td class="p-3"><%= user.name %></td>
+                      <td class="p-3"><%= user.visits %></td>
+                    </tr>
+                    <% }) %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
-        </div>
+        </details>
+      </section>
+
+      <!-- Host Attribution Chart -->
+      <section>
+        <% if (typeof hostAttribution !== 'undefined' && hostAttribution.length) { %>
+          <details class="bg-white rounded shadow" open>
+            <summary class="cursor-pointer select-none px-4 py-3 text-lg font-semibold flex items-center justify-between">
+              <span>Guest visits by house member</span>
+              <span class="text-sm text-gray-500">toggle</span>
+            </summary>
+            <div class="p-4">
+              <div class="overflow-x-auto">
+                <div class="overflow-y-auto max-h-96">
+                  <table class="w-full text-sm">
+                    <thead class="bg-gray-50">
+                      <tr>
+                        <th class="p-2 text-left">House Member</th>
+                        <th class="p-2 text-right">Visits</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <% hostAttribution.forEach(row => { %>
+                        <tr class="border-t">
+                          <td class="p-2"><%= row.hostName %></td>
+                          <td class="p-2 text-right"><%= row.visits %></td>
+                        </tr>
+                      <% }) %>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </details>
+        <% } %>
       </section>
 
       <!-- Visits Chart -->
       <section>
-        <h2 class="text-xl font-semibold mb-2">📆 Visits per Day</h2>
-        <canvas id="visitsChart"></canvas>
+        <details class="bg-white rounded shadow" open>
+          <summary class="cursor-pointer select-none px-4 py-3 text-lg font-semibold flex items-center justify-between">
+            <span>📆 Visits per Day</span>
+            <span class="text-sm text-gray-500">toggle</span>
+          </summary>
+          <div class="p-4">
+            <div class="overflow-x-auto">
+              <div class="overflow-y-auto max-h-96">
+                <canvas id="visitsChart"></canvas>
+              </div>
+            </div>
+          </div>
+        </details>
       </section>
 
       <!-- New Passes Chart -->
       <section>
-        <h2 class="text-xl font-semibold mb-2">📅 New Passes per Day</h2>
-        <canvas id="passesChart"></canvas>
+        <details class="bg-white rounded shadow" open>
+          <summary class="cursor-pointer select-none px-4 py-3 text-lg font-semibold flex items-center justify-between">
+            <span>📅 New Passes per Day</span>
+            <span class="text-sm text-gray-500">toggle</span>
+          </summary>
+          <div class="p-4">
+            <div class="overflow-x-auto">
+              <div class="overflow-y-auto max-h-96">
+                <canvas id="passesChart"></canvas>
+              </div>
+            </div>
+          </div>
+        </details>
       </section>
 
       <!-- Update Log -->
+
       <section>
-        <h2 class="text-xl font-semibold mb-2">📋 Update Log</h2>
-        <div class="overflow-x-auto">
-          <div class="overflow-y-auto max-h-96">
-            <table class="w-full text-left bg-white rounded shadow">
-              <thead class="sticky top-0 bg-gray-200 z-10">
-                <tr>
-                  <th class="p-3">Name</th>
-                  <th class="p-3">Update Time</th>
-                  <th class="p-3">Action</th>
-                  <th class="p-3">Has Devices?</th>
-                </tr>
-              </thead>
-              <tbody>
-                <% updateLog.forEach(row => { %>
-                <tr class="border-t">
-                  <td class="p-3"><%= row.name %></td>
-                  <td class="p-3"><%= row.updateTime %></td>
-                  <td class="p-3">
-                    <%= row.isUpdate ? 'Visited' : 'Created' %>
-                  </td>
-                  <td class="p-3"><%= row.hasDevices ? '✅' : '❌' %></td>
-                </tr>
-                <% }) %>
-              </tbody>
-            </table>
+        <details class="bg-white rounded shadow" open>
+          <summary class="cursor-pointer select-none px-4 py-3 text-lg font-semibold flex items-center justify-between">
+            <span>📋 Update Log</span>
+            <span class="text-sm text-gray-500">toggle</span>
+          </summary>
+          <div class="p-4">
+            <div class="overflow-x-auto">
+              <div class="overflow-y-auto max-h-96">
+                  <table class="w-full text-left bg-white rounded shadow">
+                    <thead class="sticky top-0 bg-gray-200 z-10">
+                      <tr>
+                        <th class="p-3">Name</th>
+                        <th class="p-3">Update Time</th>
+                        <th class="p-3">Action</th>
+                        <th class="p-3">Visit Kind</th>
+                        <th class="p-3">Has Devices?</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <% updateLog.forEach(row => { %>
+                      <tr class="border-t">
+                        <td class="p-3"><%= row.name %></td>
+                        <td class="p-3"><%= row.updateTime %></td>
+                        <td class="p-3">
+                          <%= row.isUpdate ? 'Visited' : 'Created' %>
+                        </td>
+                        <td class="p-3">
+                          <%= row.visitKind || '—' %>
+                        </td>
+                        <td class="p-3"><%= row.hasDevices ? '✅' : '❌' %></td>
+                      </tr>
+                      <% }) %>
+                    </tbody>
+                  </table>
+              </div>
+            </div>
           </div>
-        </div>
+        </details>
       </section>
     </div>
 
@@ -169,6 +234,7 @@
                 }]
             },
             options: {
+                // maintainAspectRatio: false,  // <- key line
                 responsive: true,
                 plugins: {
                     legend: { display: false },
@@ -193,50 +259,6 @@
 
       renderChart("visitsChart", visitsData, "Visits");
       renderChart("passesChart", passesData, "New Passes");
-
-      function setThisWeek() {
-        const today = new Date();
-        const start = new Date();
-        start.setDate(today.getDate() - today.getDay()); // Sunday
-        document.getElementById("start").value = start.toISOString().split("T")[0];
-        document.getElementById("end").value = today.toISOString().split("T")[0];
-        document.querySelector("form").submit();
-      }
-
-      function setYesterday() {
-        const y = new Date();
-        y.setDate(y.getDate() - 1);
-        const yStr = y.toISOString().split("T")[0];
-        document.getElementById("start").value = yStr;
-        document.getElementById("end").value = yStr;
-        document.querySelector("form").submit();
-      }
-
-      function setThisMonth() {
-        const today = new Date();
-        const start = new Date(today.getFullYear(), today.getMonth(), 1);
-        document.getElementById("start").value = start.toISOString().split("T")[0];
-        document.getElementById("end").value = today.toISOString().split("T")[0];
-        document.querySelector("form").submit();
-      }
-
-      function setThisYear() {
-        const today = new Date();
-        const start = new Date(today.getFullYear(), 0, 1);
-        document.getElementById("start").value = start.toISOString().split("T")[0];
-        document.getElementById("end").value = today.toISOString().split("T")[0];
-        document.querySelector("form").submit();
-      }
-
-      function setThisQuarter() {
-        const today = new Date();
-        const quarter = Math.floor(today.getMonth() / 3);
-        const startMonth = quarter * 3;
-        const start = new Date(today.getFullYear(), startMonth, 1);
-        document.getElementById("start").value = start.toISOString().split("T")[0];
-        document.getElementById("end").value = today.toISOString().split("T")[0];
-        document.querySelector("form").submit();
-      }
     </script>
   </body>
 </html>

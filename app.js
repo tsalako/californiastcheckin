@@ -21,7 +21,10 @@ const {
   sendPushUpdateByEmail,
 } = require("./utils/appleWallet");
 
-const dashboardRoute = require('./routes/dashboard');
+const dashboardRoute = require("./routes/dashboard");
+const raffleRoutes = require("./routes/raffle");
+const retroRoutes = require("./routes/retro");
+const checkinRoutes = require("./routes/checkin");
 
 const app = express();
 
@@ -31,6 +34,9 @@ app.use(express.static("public"));
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(dashboardRoute);
+app.use("/raffle", raffleRoutes);
+app.use("/retro", retroRoutes);
+app.use("/checkin", checkinRoutes);
 
 app.get("/", (req, res) => {
   res.render("index", {
@@ -84,7 +90,7 @@ app.post("/create-pass", async (req, res) => {
   console.time("createPass");
   try {
     if (platform === "apple") {
-      const { url } = await createApplePass(email, name, false);
+      const { url } = await createApplePass(email, name, (isUpdate = false));
       res.json({ url });
     } else {
       await createPassClass();
@@ -104,15 +110,15 @@ app.post("/record-visit", async (req, res) => {
   console.time("recordVisit");
   try {
     if (platform === "apple") {
-      const { url, hasRegisteredDevice } = await createApplePass(
+      const { url, hasRegisteredDevice, userId } = await createApplePass(
         email,
         name,
-        true
+        (isUpdate = true)
       );
-      res.json({ url, hasRegisteredDevice });
+      res.json({ url, hasRegisteredDevice, userId });
     } else {
-      await updatePassObject(email, name);
-      res.status(200).json({ message: "Visit recorded" });
+      const userId = await updatePassObject(email, name);
+      res.status(200).json({ message: "Visit recorded", userId });
     }
     console.log(`${name} checked in.`);
   } catch (err) {

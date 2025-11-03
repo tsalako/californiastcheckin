@@ -1,0 +1,141 @@
+<!doctype html><html><head>
+  <meta charset="utf-8"><title>Raffle</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    #wheel { width: 480px; height: 480px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+  </style>
+</head><body class="p-6">
+  <h1 class="text-2xl font-semibold mb-4">Raffle</h1>
+
+  <form method="POST" action="/raffle/create" class="mb-6 grid">
+    <div class="space-y-2">
+      <label class="font-medium block">Range</label>
+      <select name="rangeType" class="border p-2 rounded w-full">
+        <option value="last_quarter">Last Quarter</option>
+        <option value="last_year">Last Year</option>
+      </select>
+      <label class="font-medium block">Raffle Name</label>
+      <input name="name" class="border p-2 rounded w-full" placeholder="e.g. 2025Q3" value="<%= suggestedName %>">
+      <label class="font-medium block">Number of winners</label>
+      <input type="number" min="1" name="winnersTarget" class="border p-2 rounded w-40" value="1">
+      <button class="bg-black text-white px-4 py-2 rounded">Create Raffle</button>
+    </div>
+
+    <div>
+      <label class="font-medium block">Previous raffles</label>
+      <select class="border p-2 rounded w-full" onchange="if(this.value) location='/raffle/'+this.value">
+        <option value="">-- Select --</option>
+        <% raffles.forEach(r => { %>
+          <option value="<%= r.id %>" <%= raffle && raffle.id === r.id ? 'selected' : '' %>>
+            <%= r.name %> — <%= new Date(r.createdAt).toLocaleString() %>
+          </option>
+        <% }) %>
+      </select>
+      <% if (raffle) { %>
+        <div class="mt-4 text-sm text-gray-600">
+          Range: <%= new Date(raffle.start).toLocaleDateString() %> – <%= new Date(raffle.end).toLocaleDateString() %> ·
+          Entries: <%= raffle.totalEntries %> ·
+          Winners target: <%= raffle.winnersTarget %>
+        </div>
+      <% } %>
+    </div>
+  </form>
+
+  <% if (raffle) { %>
+    <div class="grid items-start">
+      <div>
+        <canvas id="wheel"></canvas>
+        <form method="POST" action="/raffle/<%= raffle.id %>/draw" class="mt-3">
+          <button
+            class="bg-indigo-600 text-white px-4 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+            <%= winners.length >= raffle.winnersTarget ? 'disabled' : '' %>>
+            Spin / Draw Winner
+          </button>
+          <% if (winners.length >= raffle.winnersTarget) { %>
+            <p class="text-sm text-gray-500 mt-1">All winners have been drawn.</p>
+          <% } %>
+        </form>
+      </div>
+      <div>
+        <h2 class="font-semibold mb-2">Participants</h2>
+        <div class="max-h-[420px] overflow-auto border rounded">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50">
+              <tr><th class="p-2 text-left">Name</th><th class="p-2 text-right">Entries</th><th class="p-2 text-right">Remaining</th></tr>
+            </thead>
+            <tbody>
+              <% participants.forEach(p => { %>
+                <tr class="border-t">
+                  <td class="p-2"><%= p.name %></td>
+                  <td class="p-2 text-right"><%= p.entries %></td>
+                  <td class="p-2 text-right"><%= p.remaining %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 class="font-semibold mt-6 mb-2">Winners</h2>
+        <ol class="list-decimal pl-5">
+          <% winners.forEach(w => { %>
+            <li class="mb-1"><span class="font-medium"><%= w.name %></span> <span class="text-gray-500">(#<%= w.drawOrder %>)</span></li>
+          <% }) %>
+        </ol>
+      </div>
+    </div>
+  <% } %>
+
+  <script>
+    (function() {
+      const raffle = <%- JSON.stringify(raffle || null) %>;
+      const participants = <%- JSON.stringify(participants || []) %>;
+      if (!raffle) return;
+
+      const canvas = document.getElementById('wheel');
+      const ctx = canvas.getContext('2d');
+      const size = Math.min(canvas.clientWidth, canvas.clientHeight) || 480;
+      canvas.width = size;
+      canvas.height = size;
+      const cx = size/2, cy = size/2, r = size/2 - 8;
+
+      const pool = participants.filter(p => p.remaining > 0);
+      const total = pool.reduce((a,b)=>a + b.remaining, 0);
+      if (total <= 0) {
+        ctx.fillStyle = '#888';
+        ctx.textAlign = 'center';
+        ctx.font = '16px sans-serif';
+        ctx.fillText('No entries', cx, cy);
+        return;
+      }
+
+      let start = -Math.PI/2;
+      pool.forEach((p, i) => {
+        const angle = (p.remaining / total) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, r, start, start + angle);
+        ctx.closePath();
+        ctx.fillStyle = `hsl(${(i*57)%360} 60% 60%)`;
+        ctx.fill();
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(start + angle/2);
+        ctx.textAlign = 'right';
+        ctx.font = '12px sans-serif';
+        ctx.fillStyle = '#111';
+        ctx.fillText(p.name + ' (' + p.remaining + ')', r - 10, 4);
+        ctx.restore();
+        start += angle;
+      });
+
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - r - 6);
+      ctx.lineTo(cx - 8, cy - r - 22);
+      ctx.lineTo(cx + 8, cy - r - 22);
+      ctx.closePath();
+      ctx.fillStyle = '#111';
+      ctx.fill();
+    })();
+  </script>
+</body></html>

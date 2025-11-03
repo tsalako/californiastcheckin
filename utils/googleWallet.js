@@ -5,13 +5,18 @@ const { formatInTimeZone } = require("date-fns-tz");
 const { Storage } = require("@google-cloud/storage");
 
 const { getLevelDetails } = require("./levelConfig.js");
+const { getOrCreateUserByEmail } = require("../services/users");
+const {
+  visitsCount,
+  alreadyCheckedInToday,
+  recordVisit,
+} = require("../services/checkins");
+const { isProd } = require("../utils/env");
 
 const issuerId = process.env.GOOGLE_WALLET_ISSUER_ID;
-const ENVIRONMENT = process.env.NODE_ENV || "development";
-const isProduction = ENVIRONMENT === "production";
-const ENV_SUFFIX = isProduction ? "" : "_staging";
+const ENV_SUFFIX = isProd() ? "" : "_staging";
 const classSuffix = `csd${ENV_SUFFIX}`;
-const postpend = process.env.GOOGLE_WALLET_POSTPEND || ENV_SUFFIX;
+const postpend = process.env.GOOGLE_WALLET_POSTPEND || "";
 const classId = `${issuerId}.${classSuffix}`;
 
 const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
@@ -21,50 +26,13 @@ const walletClient = new GoogleAuth({
   scopes: "https://www.googleapis.com/auth/wallet_object.issuer",
 });
 
-const storage = new Storage({ credentials });
-const BUCKET_NAME = process.env.GCS_BUCKET_NAME;
-const metaDir = "meta";
-const visitThrottleEnabled = isProduction;
-
-function getObjectInfo(email) {
+function getObjectId(email) {
   const objectSuffix = email.replace(/[^\w-]/g, "_").replace(/\./g, "_");
-  const objectId = `${issuerId}.${classSuffix}.${objectSuffix}${postpend}`;
-  return {
-    objectSuffix,
-    objectId,
-    metaFile: `${metaDir}/${objectSuffix}.json`,
-    updatesFile: `updates${ENV_SUFFIX}.json`,
-  };
-}
-
-async function readJsonFromGCS(filename) {
-  const file = storage.bucket(BUCKET_NAME).file(filename);
-  const contents = await file.download();
-  return JSON.parse(contents.toString());
-}
-
-async function writeJsonToGCS(filename, data) {
-  const file = storage.bucket(BUCKET_NAME).file(filename);
-  await file.save(JSON.stringify(data), {
-    contentType: "application/json",
-    resumable: false,
-  });
-}
-
-function areSameDayPST(ms1, ms2) {
-  const date1 = new Date(ms1);
-  const date2 = new Date(ms2);
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "numeric",
-    day: "numeric",
-    timeZone: "America/Los_Angeles",
-  });
-  return formatter.format(date1) === formatter.format(date2);
+  return `${issuerId}.${classSuffix}.${objectSuffix}${postpend}`;
 }
 
 async function hasGooglePass(email) {
-  const { objectId } = getObjectInfo(email);
+  const objectId = getObjectId(email);
   try {
     await walletClient.request({
       url: `https://walletobjects.googleapis.com/walletobjects/v1/loyaltyObject/${objectId}`,
@@ -79,48 +47,33 @@ async function hasGooglePass(email) {
 
 async function createGooglePass(email, name) {
   console.log("createGooglePass");
-  const { objectId, metaFile, updatesFile } = getObjectInfo(email);
 
-  console.time("updates and metadata");
-  const [updates, metadata] = await Promise.all([
-    readJsonFromGCS(updatesFile).catch(() => []),
-    readJsonFromGCS(metaFile).catch(() => ({})),
-  ]);
-  console.timeEnd("updates and metadata");
+  const objectId = getObjectId(email);
 
-  const now = new Date();
-  const nowMillis = now.getTime();
-  const nowFormatted = formatInTimeZone(now, "America/Los_Angeles", "iii PP p");
+  console.time("create user");
+  const user = await getOrCreateUserByEmail(email, name);
+  console.timeEnd("create user");
 
-  const visitTimestamps = Array.isArray(metadata.visitTimestamps)
-    ? metadata.visitTimestamps
-    : [];
-  visitTimestamps.push(nowMillis);
+  console.time("record visit");
+  const visit = await recordVisit({ userId: user.id });
+  console.timeEnd("record visit");
 
-  metadata.visitTimestamps = visitTimestamps;
-  if (!metadata.name) metadata.name = name;
-  if (!metadata.email) metadata.email = email;
-  if (!metadata.createTime) metadata.createTime = nowMillis;
+  console.time("get visit count");
+  const countNow = await visitsCount(user.id);
+  console.timeEnd("get visit count");
 
-  const entry = {};
-  entry.name = name;
-  entry.updateTime = nowMillis;
-  entry.isUpdate = false;
-  updates.push(entry);
+  const level = getLevelDetails(countNow);
+  const nowFormatted = formatInTimeZone(
+    visit.occurredAt,
+    "America/Los_Angeles",
+    "iii PP p"
+  );
 
-  console.time("write updates and metadata");
-  await Promise.all([
-    writeJsonToGCS(metaFile, metadata),
-    writeJsonToGCS(updatesFile, updates),
-  ]);
-  console.timeEnd("write updates and metadata");
-
-  const level = getLevelDetails(visitTimestamps.length);
   const loyaltyObject = {
     accountName: name,
     loyaltyPoints: {
       label: "Visits",
-      balance: { int: visitTimestamps.length },
+      balance: { int: countNow },
     },
     secondaryLoyaltyPoints: {
       label: "Last Visit",
@@ -130,7 +83,7 @@ async function createGooglePass(email, name) {
     classId,
     state: "ACTIVE",
     smartTapRedemptionValue: email,
-    textModulesData: [{ id: 'level', header: 'Level', body: level.name }],
+    textModulesData: [{ id: "level", header: "Level", body: level.name }],
     passConstraints: { nfcConstraint: ["BLOCK_PAYMENT"] },
   };
 
@@ -151,66 +104,46 @@ async function createGooglePass(email, name) {
 
 async function updatePassObject(email, name) {
   console.log("updatePassObject");
-  const { objectId, metaFile, updatesFile } = getObjectInfo(email);
 
-  console.time("updates and metadata");
-  const [updates, metadata] = await Promise.all([
-    readJsonFromGCS(updatesFile).catch(() => []),
-    readJsonFromGCS(metaFile).catch(() => ({})),
-  ]);
-  console.timeEnd("updates and metadata");
+  console.time("create user");
+  const user = await getOrCreateUserByEmail(email, name);
+  console.timeEnd("create user");
 
-  const now = new Date();
-  const nowMillis = now.getTime();
-  const nowFormatted = formatInTimeZone(now, "America/Los_Angeles", "iii PP p");
-
-  const visitTimestamps = Array.isArray(metadata.visitTimestamps)
-    ? metadata.visitTimestamps
-    : [];
-  const lastTimestamp = visitTimestamps[visitTimestamps.length - 1] || 0;
-
-  if (
-    visitThrottleEnabled &&
-    !isNaN(lastTimestamp) &&
-    areSameDayPST(nowMillis, lastTimestamp)
-  ) {
-    console.log(`${name} attempted to check in more than once.`);
+  const alreadyCheckedIn = await alreadyCheckedInToday(user.id);
+  if (isProd() && alreadyCheckedIn) {
     throw new Error("You've already checked in today.");
   }
 
-  visitTimestamps.push(nowMillis);
-  metadata.visitTimestamps = visitTimestamps;
-  if (!metadata.name) metadata.name = name;
-  if (!metadata.email) metadata.email = email;
-  if (!metadata.createTime) metadata.createTime = nowMillis;
+  console.time("record visit");
+  const visit = await recordVisit({ userId: user.id });
+  console.timeEnd("record visit");
 
-  const entry = {};
-  entry.name = name;
-  entry.updateTime = nowMillis;
-  entry.isUpdate = true;
-  updates.push(entry);
+  console.time("get visit count");
+  const countNow = await visitsCount(user.id);
+  console.timeEnd("get visit count");
 
-  console.time("write updates and metadata");
-  await Promise.all([
-    writeJsonToGCS(metaFile, metadata),
-    writeJsonToGCS(updatesFile, updates),
-  ]);
-  console.timeEnd("write updates and metadata");
+  const level = getLevelDetails(countNow);
+  const nowFormatted = formatInTimeZone(
+    visit.occurredAt,
+    "America/Los_Angeles",
+    "iii PP p"
+  );
 
-  const level = getLevelDetails(visitTimestamps.length);
   const patchBody = {
-    loyaltyPoints: { balance: { int: visitTimestamps.length } },
+    loyaltyPoints: { balance: { int: countNow } },
     secondaryLoyaltyPoints: { balance: { string: nowFormatted } },
-    textModulesData: [{ id: 'level', header: 'Level', body: level.name }],
+    textModulesData: [{ id: "level", header: "Level", body: level.name }],
   };
 
   console.time("patchPass");
+  const objectId = getObjectId(email);
   await walletClient.request({
     url: `https://walletobjects.googleapis.com/walletobjects/v1/loyaltyObject/${objectId}`,
     method: "PATCH",
     data: patchBody,
   });
   console.timeEnd("patchPass");
+  return user.id;
 }
 
 async function createPassClass() {

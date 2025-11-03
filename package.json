@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@prisma/client": "^5.19.1",
     "@google-cloud/storage": "^7.16.0",
     "apn": "^2.2.0",
     "body-parser": "^1.19.0",
@@ -15,5 +16,12 @@
     "node-fetch": "^2.7.0",
     "passkit-generator": "^3.4.0",
     "tmp-promise": "^3.0.3"
+  },
+  "devDependencies": {
+    "prisma": "^5.19.1"
+  },
+  "scripts": {
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate deploy"
   }
 }
