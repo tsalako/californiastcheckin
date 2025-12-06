@@ -93,20 +93,6 @@
           </div>
         </div>
 
-        <!-- Companions (revealed after a successful record) -->
-        <div id="companionsWrapper" class="slot-item hidden">
-          <div class="manual-signin-wrapper">
-            <form id="companionsForm" class="manual-signin-form">
-              <label class="font-medium">Bringing friends today?</label>
-              <div class="form-row">
-                <input type="number" id="companionsCount" min="1" value="1" class="text-input" />
-                <button type="submit" class="button">Add Companions</button>
-              </div>
-              <p id="companionsMsg" class="text-muted" style="margin-top:.5rem;"></p>
-            </form>
-          </div>
-        </div>
-
         <!-- Feedback + Wallet -->
         <div class="stack-slot">
           <div class="slot-item visible">
@@ -325,36 +311,6 @@
           recordVisit.textContent = "Record Visit";
           recordVisit.disabled = false;
         }
-
-        // Reveal companions UI (server enforces once-per-day)
-        try {
-          const compWrap = document.getElementById("companionsWrapper");
-          const compForm = document.getElementById("companionsForm");
-          const compMsg  = document.getElementById("companionsMsg");
-          if (compWrap && compForm) {
-            compWrap.classList.replace("hidden","visible");
-            compMsg.textContent = "Add the number of friends you brought today (once per day).";
-
-            compForm.onsubmit = async (e) => {
-              console.log("submit form");
-              e.preventDefault();
-              const n = Math.max(1, Number(document.getElementById("companionsCount").value)||1);
-              const r = await fetch("/checkin/companions", {
-                method: "POST",
-                headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                // body: "primaryUserId=" + encodeURIComponent((window.__USER_ID__||\"\")) + "&count=" + n"
-                body: `primaryUserId=${encodeURIComponent(data.userId)}&count=${n}`
-              });
-              if (r.ok) {
-                const data = await r.json();
-                compMsg.textContent = data.message;
-              } else {
-                const d = await r.json().catch(()=>({}));
-                compMsg.textContent = (d.message || "Could not add companions (maybe already added today).");
-              }
-            };
-          }
-        } catch (_e) { /* non-blocking */ }
 
         setTimeout(() => feedbackEl.classList.remove("show"), 3000);
       });

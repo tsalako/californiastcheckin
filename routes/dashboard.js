@@ -310,7 +310,7 @@ router.get("/dashboard", async (req, res) => {
         COALESCE(u."name", u."email", 'Anonymous') AS name,
         v."occurredAt" AS update_time,
         CASE
-          WHEN u."id" IS NULL THEN to_char((v."occurredAt" AT TIME ZONE 'UTC' AT TIME ZONE 'America/Los_Angeles'),
+          WHEN v."kind" = 'retro' THEN to_char((v."occurredAt" AT TIME ZONE 'UTC' AT TIME ZONE 'America/Los_Angeles'),
                 'Dy, Mon DD, YYYY')
           ELSE to_char((v."occurredAt" AT TIME ZONE 'UTC' AT TIME ZONE 'America/Los_Angeles'),
                 'Dy, Mon DD, YYYY, HH12:MI AM')

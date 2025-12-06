@@ -37,8 +37,8 @@ async function visitsCount(userId) {
   return prisma.visit.count({ where: { userId } });
 }
 
-async function alreadyCheckedInToday(userId) {
-  const { start, end } = pstDayBounds();
+async function alreadyCheckedInToday(userId, date) {
+  const { start, end } = pstDayBounds(date);
   console.log("Start" + start + " End: " + end);
   const hit = await prisma.visit.findFirst({
     where: { userId, occurredAt: { gte: start, lte: end } },
@@ -70,7 +70,7 @@ async function addRetroVisitForUser({ email, name, occurredAt, note }) {
   const user = await getOrCreateUserByEmail(email, name);
 
   if (isProd() && (await alreadyCheckedInToday(user.id, occurredAt))) {
-    throw new Error("You've already checked in today.");
+    throw new Error("You've already checked in that day.");
   }
 
   return prisma.visit.create({
