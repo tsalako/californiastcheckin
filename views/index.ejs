@@ -7,11 +7,32 @@
     <link rel="stylesheet" href="/style.css" />
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script>
+      window.AUTO_CHECK_IN_AUTHORIZED = <%= autoCheckInAuthorized ? 'true' : 'false' %>;
       window.AUTO_PASS_CREATION = <%= autoPassCreation ? 'true' : 'false' %>;
       window.AUTO_VISIT_RECORDING = <%= autoVisitRecording ? 'true' : 'false' %>;
       window.AUTO_CLICK_CREATION_LINKS = <%= autoClickCreationLinks ? 'true' : 'false' %>;
       window.AUTO_CLICK_RECORDING_LINKS = <%= autoClickRecordingLinks ? 'true' : 'false' %>;
+      window.CLOSE_AFTER_WALLET_REDIRECT = <%= closeAfterWalletRedirect ? 'true' : 'false' %>;
       window.UPDATE_APPLE_WALLET = <%= udpateAppleWallet ? 'true' : 'false' %>;
+
+      if (window.AUTO_CHECK_IN_AUTHORIZED) {
+        // Strip the NFC token from the visible URL after this render is authorized.
+        // The current auto flow can continue, but refresh/history reopens request `/`
+        // without the token and therefore fall back to the manual check-in path.
+        const initialUrl = new URL(window.location.href);
+        if (
+          initialUrl.searchParams.has("checkin") ||
+          initialUrl.searchParams.has("autoToken")
+        ) {
+          initialUrl.searchParams.delete("checkin");
+          initialUrl.searchParams.delete("autoToken");
+          window.history.replaceState(
+            null,
+            "",
+            initialUrl.pathname + initialUrl.search + initialUrl.hash
+          );
+        }
+      }
     </script>
   </head>
   <body>
@@ -116,6 +137,23 @@
       const feedbackEl = document.getElementById("feedback");
       const recordVisit = document.getElementById("recordVisit");
       const createPassSubmit = document.getElementById("createPassSubmit");
+
+      function tryCloseAppAfterWalletRedirect() {
+        if (!window.CLOSE_AFTER_WALLET_REDIRECT) return;
+
+        feedbackEl.textContent = "Pass sent to Wallet. You can close this tab.";
+        feedbackEl.classList.add("show");
+
+        setTimeout(() => {
+          window.open("", "_self");
+          window.close();
+        }, 1200);
+      }
+
+      function autoOpenWalletLink(anchor) {
+        anchor.click();
+        tryCloseAppAfterWalletRedirect();
+      }
 
       // Will be set by /hasPass or /record-visit JSON
       window.__USER_ID__ = window.__USER_ID__ || null;
@@ -229,7 +267,7 @@
             container.innerHTML = "";
             container.appendChild(a);
             container.classList.add("show");
-            if (window.AUTO_CLICK_CREATION_LINKS) a.click();
+            if (window.AUTO_CLICK_CREATION_LINKS) autoOpenWalletLink(a);
           };
 
           img.onerror = () => {
@@ -237,7 +275,7 @@
             container.innerHTML = "";
             container.appendChild(a);
             container.classList.add("show");
-            if (window.AUTO_CLICK_CREATION_LINKS) a.click();
+            if (window.AUTO_CLICK_CREATION_LINKS) autoOpenWalletLink(a);
           };
         } else {
           const data = await res.json().catch(() => ({}));
@@ -292,7 +330,7 @@
                 container.innerHTML = "";
                 container.appendChild(a);
                 container.classList.add("show");
-                if (window.AUTO_CLICK_RECORDING_LINKS) a.click();
+                if (window.AUTO_CLICK_RECORDING_LINKS) autoOpenWalletLink(a);
               };
 
               img.onerror = () => {
@@ -301,7 +339,7 @@
                 container.innerHTML = "";
                 container.appendChild(a);
                 container.classList.add("show");
-                if (window.AUTO_CLICK_RECORDING_LINKS) a.click();
+                if (window.AUTO_CLICK_RECORDING_LINKS) autoOpenWalletLink(a);
               };
             }
           }
