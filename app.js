@@ -38,14 +38,35 @@ app.use("/raffle", raffleRoutes);
 app.use("/retro", retroRoutes);
 app.use("/checkin", checkinRoutes);
 
+function envFlag(name) {
+  return process.env[name] === "true";
+}
+
+function isAutoCheckInAuthorized(req) {
+  const autoToken = process.env.CHECKIN_AUTO_TOKEN;
+  if (!autoToken) return true;
+
+  const suppliedToken = req.query.checkin || req.query.autoToken;
+  return suppliedToken === autoToken;
+}
+
 app.get("/", (req, res) => {
+  const autoCheckInAuthorized = isAutoCheckInAuthorized(req);
+
   res.render("index", {
     googleClientId: process.env.GCP_PROJECT_ID,
-    autoPassCreation: process.env.AUTO_PASS_CREATION === "true",
-    autoVisitRecording: process.env.AUTO_VISIT_RECORDING === "true",
-    autoClickCreationLinks: process.env.AUTO_CLICK_CREATION_LINKS === "true",
-    autoClickRecordingLinks: process.env.AUTO_CLICK_RECORDING_LINKS === "true",
-    udpateAppleWallet: process.env.UPDATE_APPLE_WALLET === "true",
+    autoCheckInAuthorized,
+    autoPassCreation:
+      autoCheckInAuthorized && envFlag("AUTO_PASS_CREATION"),
+    autoVisitRecording:
+      autoCheckInAuthorized && envFlag("AUTO_VISIT_RECORDING"),
+    autoClickCreationLinks:
+      autoCheckInAuthorized && envFlag("AUTO_CLICK_CREATION_LINKS"),
+    autoClickRecordingLinks:
+      autoCheckInAuthorized && envFlag("AUTO_CLICK_RECORDING_LINKS"),
+    closeAfterWalletRedirect:
+      autoCheckInAuthorized && envFlag("CLOSE_AFTER_WALLET_REDIRECT"),
+    udpateAppleWallet: envFlag("UPDATE_APPLE_WALLET"),
   });
 });
 
