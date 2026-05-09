@@ -55,7 +55,9 @@ router.get("/:id", async (req, res) => {
 
 router.post("/:id/draw", async (req, res) => {
   try {
-    await drawWinner(req.params.id);
+    await drawWinner(req.params.id, {
+      allowExtra: req.body.allowExtra === "1",
+    });
     const raffle = await getRaffle(req.params.id);
     res.render("raffle", {
       raffles: await listRaffles(),
