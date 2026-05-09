@@ -13,10 +13,11 @@
       <label class="font-medium block">Range</label>
       <select name="rangeType" class="border p-2 rounded w-full">
         <option value="last_quarter">Last Quarter</option>
+        <option value="two_quarters_ago">2 Quarters Ago</option>
         <option value="last_year">Last Year</option>
       </select>
       <label class="font-medium block">Raffle Name</label>
-      <input name="name" class="border p-2 rounded w-full" placeholder="e.g. 2025Q3" value="<%= suggestedName %>">
+      <input name="name" class="border p-2 rounded w-full" placeholder="Defaults to selected range, e.g. <%= suggestedName %>">
       <label class="font-medium block">Number of winners</label>
       <input type="number" min="1" name="winnersTarget" class="border p-2 rounded w-40" value="1">
       <button class="bg-black text-white px-4 py-2 rounded">Create Raffle</button>
@@ -46,14 +47,26 @@
     <div class="grid items-start">
       <div>
         <canvas id="wheel"></canvas>
-        <form method="POST" action="/raffle/<%= raffle.id %>/draw" class="mt-3">
+        <form method="POST" action="/raffle/<%= raffle.id %>/draw" class="mt-3 space-y-2">
+          <% const raffleComplete = winners.length >= raffle.winnersTarget; %>
+          <% const hasRemainingEntries = participants.some(p => p.remaining > 0); %>
+          <% if (raffleComplete && hasRemainingEntries) { %>
+            <input type="hidden" name="allowExtra" value="1">
+          <% } %>
           <button
-            class="bg-indigo-600 text-white px-4 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-            <%= winners.length >= raffle.winnersTarget ? 'disabled' : '' %>>
+            id="draw-button"
+            class="bg-indigo-600 text-white px-4 py-2 rounded <%= raffleComplete ? 'opacity-50 cursor-not-allowed' : '' %> disabled:opacity-50 disabled:cursor-not-allowed"
+            data-confirm-extra="<%= raffleComplete && hasRemainingEntries ? 'true' : 'false' %>"
+            <%= raffleComplete && !hasRemainingEntries ? 'disabled' : '' %>>
             Spin / Draw Winner
           </button>
-          <% if (winners.length >= raffle.winnersTarget) { %>
-            <p class="text-sm text-gray-500 mt-1">All winners have been drawn.</p>
+          <% if (raffleComplete) { %>
+            <p class="text-sm text-gray-500">All planned winners have been drawn.</p>
+            <% if (hasRemainingEntries) { %>
+              <p class="text-xs text-gray-500">Drawing again will increase the winners target by 1 and draw from remaining participants.</p>
+            <% } else { %>
+              <p class="text-xs text-gray-500">No remaining participants are available for extra draws.</p>
+            <% } %>
           <% } %>
         </form>
       </div>
@@ -91,6 +104,16 @@
       const raffle = <%- JSON.stringify(raffle || null) %>;
       const participants = <%- JSON.stringify(participants || []) %>;
       if (!raffle) return;
+
+      const drawButton = document.getElementById('draw-button');
+      if (drawButton && drawButton.dataset.confirmExtra === 'true') {
+        drawButton.addEventListener('click', (event) => {
+          const confirmed = window.confirm(
+            'All planned winners have already been drawn. Are you sure you want to draw another winner?'
+          );
+          if (!confirmed) event.preventDefault();
+        });
+      }
 
       const canvas = document.getElementById('wheel');
       const ctx = canvas.getContext('2d');
