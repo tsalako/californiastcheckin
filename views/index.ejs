@@ -18,7 +18,7 @@
       if (window.AUTO_CHECK_IN_AUTHORIZED) {
         // Strip the NFC token from the visible URL after this render is authorized.
         // The current auto flow can continue, but refresh/history reopens request `/`
-        // without the token and therefore falls back to the manual check-in path.
+        // without the token and therefore fall back to the manual check-in path.
         const initialUrl = new URL(window.location.href);
         if (
           initialUrl.searchParams.has("checkin") ||

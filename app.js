@@ -161,10 +161,12 @@ app.get("/", (req, res) => {
   const autoCheckInAuthorized = isAutoCheckInAuthorized(req);
 
   res.render("index", {
-    googleClientId,
+    googleClientId: process.env.GCP_PROJECT_ID,
     autoCheckInAuthorized,
-    autoPassCreation: autoCheckInAuthorized && envFlag("AUTO_PASS_CREATION"),
-    autoVisitRecording: autoCheckInAuthorized && envFlag("AUTO_VISIT_RECORDING"),
+    autoPassCreation:
+      autoCheckInAuthorized && envFlag("AUTO_PASS_CREATION"),
+    autoVisitRecording:
+      autoCheckInAuthorized && envFlag("AUTO_VISIT_RECORDING"),
     autoClickCreationLinks:
       autoCheckInAuthorized && envFlag("AUTO_CLICK_CREATION_LINKS"),
     autoClickRecordingLinks:

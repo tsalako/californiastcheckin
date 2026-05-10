@@ -25,3 +25,24 @@ codelab. This codelab demonstrates how to perform the following tasks:
 ## Support
 
 For any questions or issues, please submit an issue on this repository.
+
+## Auto check-in safety
+
+The automatic check-in switches (`AUTO_PASS_CREATION`, `AUTO_VISIT_RECORDING`,
+`AUTO_CLICK_CREATION_LINKS`, and `AUTO_CLICK_RECORDING_LINKS`) can be limited to
+links that include a shared token. Set `CHECKIN_AUTO_TOKEN` and write the NFC tag
+with a URL like:
+
+```text
+https://your-domain.example/?checkin=<CHECKIN_AUTO_TOKEN>
+```
+
+When `CHECKIN_AUTO_TOKEN` is set, visits to `/` without the matching `checkin` or
+`autoToken` query parameter keep the manual buttons available but do not run the
+automatic flow. This prevents an old browser tab or bare homepage visit from
+recording a check-in just because the automatic environment variables are on.
+
+To try to leave the browser after the wallet link opens, set
+`CLOSE_AFTER_WALLET_REDIRECT=true`. Browsers may block scripted tab closing when
+the tab was not opened by JavaScript, so this is a best-effort cleanup rather
+than an access-control mechanism.
