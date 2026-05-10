@@ -1,7 +1,7 @@
 const { prisma } = require("../utils/db");
 const { isProd } = require("../utils/env");
 
-function getLastQuarterBounds(now = new Date()) {
+function getQuarterBoundsAgo(quartersAgo = 1, now = new Date()) {
   const tz = "America/Los_Angeles";
 
   // PST calendar parts
@@ -17,19 +17,28 @@ function getLastQuarterBounds(now = new Date()) {
   const pad = (n) => String(n).padStart(2, "0");
   const ymd = (Y, M, D) => `${String(Y).padStart(4, "0")}-${pad(M)}-${pad(D)}`;
 
-  const q0 = Math.floor((m - 1) / 3) * 3 + 1;
-  const pm = q0 - 3;
-  const ny = pm < 1 ? y - 1 : y;
-  const pm2 = ((pm + 11) % 12) + 1;
-  const endDay = new Date(ny, pm2 + 1, 0).getDate();
+  const currentQuarterIndex = y * 4 + Math.floor((m - 1) / 3);
+  const targetQuarterIndex = currentQuarterIndex - quartersAgo;
+  const quarterYear = Math.floor(targetQuarterIndex / 4);
+  const zeroBasedQuarter = ((targetQuarterIndex % 4) + 4) % 4;
+  const startMonth = zeroBasedQuarter * 3 + 1;
+  const endMonth = startMonth + 2;
+  const endDay = new Date(quarterYear, endMonth, 0).getDate();
+  const quarterNum = zeroBasedQuarter + 1;
 
-  const quarterNum = Math.ceil(pm2 / 3);
-  const quarterStr = `${ny}Q${quarterNum}`;
   return {
-    start: ymd(ny, pm2, 1),
-    end: ymd(ny, pm2 + 2, endDay),
-    name: quarterStr,
+    start: ymd(quarterYear, startMonth, 1),
+    end: ymd(quarterYear, endMonth, endDay),
+    name: `${quarterYear}Q${quarterNum}`,
   };
+}
+
+function getLastQuarterBounds(now = new Date()) {
+  return getQuarterBoundsAgo(1, now);
+}
+
+function getTwoQuartersAgoBounds(now = new Date()) {
+  return getQuarterBoundsAgo(2, now);
 }
 
 function getLastYearBounds(now = new Date()) {
@@ -70,10 +79,7 @@ async function buildParticipants({ start, end }) {
 
 async function createRaffle({ rangeType, winnersTarget, nameOverride }) {
   const now = new Date();
-  const bounds =
-    rangeType === "last_year"
-      ? getLastYearBounds(now)
-      : getLastQuarterBounds(now);
+  const bounds = getRangeBounds(rangeType, now);
   const start = new Date(bounds.start + "T00:00:00"),
     end = new Date(bounds.end + "T23:59:59.999");
   const defaultName = bounds.name;
@@ -109,7 +115,13 @@ async function createRaffle({ rangeType, winnersTarget, nameOverride }) {
 async function getRaffle(id) {
   return prisma.raffle.findUnique({
     where: { id },
-    include: { participants: true, winners: { orderBy: { drawOrder: "asc" } } },
+    include: {
+      participants: true,
+      winners: {
+        orderBy: { drawOrder: "asc" },
+        include: { user: { select: { email: true } } },
+      },
+    },
   });
 }
 
@@ -125,26 +137,38 @@ function pickWeighted(participants) {
   return pool[pool.length - 1];
 }
 
-async function drawWinner(raffleId) {
+async function drawWinner(raffleId, { allowExtra = false } = {}) {
   const raffle = await prisma.raffle.findUnique({
     where: { id: raffleId },
     include: { participants: true, winners: true },
   });
   if (!raffle) throw new Error("raffle_not_found");
   const already = raffle.winners.length;
-  if (already >= raffle.winnersTarget) {
+  const needsExtraSlot = already >= raffle.winnersTarget;
+  if (needsExtraSlot && !allowExtra) {
     const e = new Error("RAFFLE_COMPLETE");
     e.code = "RAFFLE_COMPLETE";
     throw e;
   }
+
   const pick = pickWeighted(raffle.participants);
   if (!pick) {
     const e = new Error("NO_ENTRIES");
     e.code = "NO_ENTRIES";
     throw e;
   }
+
   const order = already + 1;
-  const [, winner] = await prisma.$transaction([
+  const operations = [];
+  if (needsExtraSlot) {
+    operations.push(
+      prisma.raffle.update({
+        where: { id: raffleId },
+        data: { winnersTarget: already + 1 },
+      })
+    );
+  }
+  operations.push(
     prisma.raffleParticipant.update({
       where: { id: pick.id },
       data: { remaining: 0 },
@@ -156,9 +180,11 @@ async function drawWinner(raffleId) {
         name: pick.name,
         drawOrder: order,
       },
-    }),
-  ]);
-  return winner;
+    })
+  );
+
+  const results = await prisma.$transaction(operations);
+  return results[results.length - 1];
 }
 
 async function listRaffles() {
@@ -177,11 +203,20 @@ async function listRaffles() {
   });
 }
 
+function getRangeBounds(rangeType, now = new Date()) {
+  if (rangeType === "last_year") return getLastYearBounds(now);
+  if (rangeType === "two_quarters_ago") return getTwoQuartersAgoBounds(now);
+  return getLastQuarterBounds(now);
+}
+
 module.exports = {
   createRaffle,
   getRaffle,
   drawWinner,
   listRaffles,
+  getQuarterBoundsAgo,
   getLastQuarterBounds,
+  getTwoQuartersAgoBounds,
   getLastYearBounds,
+  getRangeBounds,
 };
