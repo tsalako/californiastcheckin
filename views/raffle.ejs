@@ -92,7 +92,12 @@
         <h2 class="font-semibold mt-6 mb-2">Winners</h2>
         <ol class="list-decimal pl-5">
           <% winners.forEach(w => { %>
-            <li class="mb-1"><span class="font-medium"><%= w.name %></span> <span class="text-gray-500">(#<%= w.drawOrder %>)</span></li>
+            <% const winnerEmail = w.user && w.user.email ? w.user.email : "Email unavailable"; %>
+            <li class="mb-1">
+              <span class="font-medium"><%= w.name %></span>
+              <span class="text-gray-600">&lt;<%= winnerEmail %>&gt;</span>
+              <span class="text-gray-500">(#<%= w.drawOrder %>)</span>
+            </li>
           <% }) %>
         </ol>
       </div>

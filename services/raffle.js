@@ -115,7 +115,13 @@ async function createRaffle({ rangeType, winnersTarget, nameOverride }) {
 async function getRaffle(id) {
   return prisma.raffle.findUnique({
     where: { id },
-    include: { participants: true, winners: { orderBy: { drawOrder: "asc" } } },
+    include: {
+      participants: true,
+      winners: {
+        orderBy: { drawOrder: "asc" },
+        include: { user: { select: { email: true } } },
+      },
+    },
   });
 }
 
