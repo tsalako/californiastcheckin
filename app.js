@@ -1,6 +1,7 @@
 const fetch = require("node-fetch");
 const express = require("express");
 const bodyParser = require("body-parser");
+const crypto = require("node:crypto");
 const path = require("path");
 require("dotenv").config();
 
@@ -25,14 +26,120 @@ const dashboardRoute = require("./routes/dashboard");
 const raffleRoutes = require("./routes/raffle");
 const retroRoutes = require("./routes/retro");
 const checkinRoutes = require("./routes/checkin");
+const { OAuth2Client } = require("google-auth-library");
 
 const app = express();
+const googleClientId = process.env.GOOGLE_CLIENT_ID || process.env.GCP_PROJECT_ID;
+const googleAuthClient = new OAuth2Client(googleClientId);
+const identityCookieName = "californiastcheckin.identity";
+const identityMaxAgeSeconds = 60 * 60 * 24 * 366;
+
+function getCookieValue(req, name) {
+  const cookieHeader = req.headers.cookie || "";
+  return cookieHeader
+    .split(";")
+    .map((cookie) => cookie.trim())
+    .find((cookie) => cookie.startsWith(`${name}=`))
+    ?.slice(name.length + 1);
+}
+
+function getIdentitySecret() {
+  return process.env.SESSION_SECRET || process.env.JWT_SECRET || process.env.PASS_SECRET || "dev-secret-change-me";
+}
+
+function signIdentityPayload(payload) {
+  return crypto.createHmac("sha256", getIdentitySecret()).update(payload).digest("base64url");
+}
+
+function serializeIdentity(identity) {
+  const payload = Buffer.from(JSON.stringify(identity)).toString("base64url");
+  return `${payload}.${signIdentityPayload(payload)}`;
+}
+
+function parseIdentityCookie(req) {
+  const rawCookie = getCookieValue(req, identityCookieName);
+  if (!rawCookie) return null;
+
+  const [payload, signature] = decodeURIComponent(rawCookie).split(".");
+  if (!payload || !signature) return null;
+
+  const expectedSignature = signIdentityPayload(payload);
+  const signatureBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expectedSignature);
+  if (signatureBuffer.length !== expectedBuffer.length) return null;
+  if (!crypto.timingSafeEqual(signatureBuffer, expectedBuffer)) return null;
+
+  const identity = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+  if (!identity.email) return null;
+  return identity;
+}
+
+function setIdentityCookie(req, res, identity) {
+  res.cookie(identityCookieName, serializeIdentity({
+    email: identity.email,
+    name: identity.name || identity.email,
+    iat: Date.now(),
+  }), {
+    httpOnly: true,
+    maxAge: identityMaxAgeSeconds * 1000,
+    sameSite: "lax",
+    secure: req.secure || req.get("x-forwarded-proto") === "https",
+  });
+}
+
+async function verifyGoogleCredential(credential) {
+  const ticket = await googleAuthClient.verifyIdToken({
+    idToken: credential,
+    audience: googleClientId,
+  });
+  const payload = ticket.getPayload();
+  return { email: payload.email, name: payload.name || payload.email };
+}
+
 
 app.set("view engine", "ejs");
+app.set("trust proxy", 1);
 app.set("views", path.join(__dirname, "views"));
 app.use(express.static("public"));
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
+
+app.get("/auth/session", (req, res) => {
+  try {
+    res.json({ identity: parseIdentityCookie(req) });
+  } catch (err) {
+    console.error("auth/session error:", err);
+    res.json({ identity: null });
+  }
+});
+
+app.post("/auth/google", async (req, res) => {
+  try {
+    const { credential } = req.body;
+    if (!credential) {
+      return res.status(400).json({ error: "Missing Google credential" });
+    }
+
+    const identity = await verifyGoogleCredential(credential);
+    setIdentityCookie(req, res, identity);
+    res.json({ ok: true, identity });
+  } catch (err) {
+    console.error("auth/google error:", err);
+    res.status(401).json({ error: "Could not verify Google sign-in" });
+  }
+});
+
+app.post("/auth/manual", (req, res) => {
+  const { email, name } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: "Missing email" });
+  }
+
+  const identity = { email, name: name || email };
+  setIdentityCookie(req, res, identity);
+  res.json({ ok: true, identity });
+});
+
 app.use(dashboardRoute);
 app.use("/raffle", raffleRoutes);
 app.use("/retro", retroRoutes);
