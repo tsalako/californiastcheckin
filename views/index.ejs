@@ -7,11 +7,32 @@
     <link rel="stylesheet" href="/style.css" />
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script>
+      window.AUTO_CHECK_IN_AUTHORIZED = <%= autoCheckInAuthorized ? 'true' : 'false' %>;
       window.AUTO_PASS_CREATION = <%= autoPassCreation ? 'true' : 'false' %>;
       window.AUTO_VISIT_RECORDING = <%= autoVisitRecording ? 'true' : 'false' %>;
       window.AUTO_CLICK_CREATION_LINKS = <%= autoClickCreationLinks ? 'true' : 'false' %>;
       window.AUTO_CLICK_RECORDING_LINKS = <%= autoClickRecordingLinks ? 'true' : 'false' %>;
+      window.CLOSE_AFTER_WALLET_REDIRECT = <%= closeAfterWalletRedirect ? 'true' : 'false' %>;
       window.UPDATE_APPLE_WALLET = <%= udpateAppleWallet ? 'true' : 'false' %>;
+
+      if (window.AUTO_CHECK_IN_AUTHORIZED) {
+        // Strip the NFC token from the visible URL after this render is authorized.
+        // The current auto flow can continue, but refresh/history reopens request `/`
+        // without the token and therefore falls back to the manual check-in path.
+        const initialUrl = new URL(window.location.href);
+        if (
+          initialUrl.searchParams.has("checkin") ||
+          initialUrl.searchParams.has("autoToken")
+        ) {
+          initialUrl.searchParams.delete("checkin");
+          initialUrl.searchParams.delete("autoToken");
+          window.history.replaceState(
+            null,
+            "",
+            initialUrl.pathname + initialUrl.search + initialUrl.hash
+          );
+        }
+      }
     </script>
   </head>
   <body>
@@ -27,6 +48,7 @@
               data-client_id="<%= googleClientId %>"
               data-callback="onSignIn"
               data-auto_prompt="false"
+              data-auto_select="true"
             ></div>
             <div
               class="g_id_signin"
@@ -117,17 +139,103 @@
       const recordVisit = document.getElementById("recordVisit");
       const createPassSubmit = document.getElementById("createPassSubmit");
 
+      function tryCloseAppAfterWalletRedirect() {
+        if (!window.CLOSE_AFTER_WALLET_REDIRECT) return;
+
+        feedbackEl.textContent = "Pass sent to Wallet. You can close this tab.";
+        feedbackEl.classList.add("show");
+
+        setTimeout(() => {
+          window.open("", "_self");
+          window.close();
+        }, 1200);
+      }
+
+      function autoOpenWalletLink(anchor) {
+        anchor.click();
+        tryCloseAppAfterWalletRedirect();
+      }
+
       // Will be set by /hasPass or /record-visit JSON
       window.__USER_ID__ = window.__USER_ID__ || null;
 
-      function handleSignedInState(email, name) {
+      const IDENTITY_MAX_AGE_SECONDS = 60 * 60 * 24 * 366;
+
+      function getCookieMap() {
+        return document.cookie.split("; ").reduce((acc, c) => {
+          if (!c) return acc;
+          const separatorIndex = c.indexOf("=");
+          const key = separatorIndex >= 0 ? c.slice(0, separatorIndex) : c;
+          const value = separatorIndex >= 0 ? c.slice(separatorIndex + 1) : "";
+          acc[key] = decodeURIComponent(value);
+          return acc;
+        }, {});
+      }
+
+      function getCookieAttributes() {
+        const attrs = [`max-age=${IDENTITY_MAX_AGE_SECONDS}`, "path=/", "SameSite=Lax"];
+        if (window.location.protocol === "https:") attrs.push("Secure");
+        return attrs.join("; ");
+      }
+
+      function persistSignedInState(email, name) {
+        const cookieAttributes = getCookieAttributes();
+        document.cookie = `userEmail=${encodeURIComponent(email)}; ${cookieAttributes}`;
+        document.cookie = `name=${encodeURIComponent(name)}; ${cookieAttributes}`;
+      }
+
+      function getStoredIdentity() {
+        const cookies = getCookieMap();
+        if (!cookies.userEmail) return null;
+        return { email: cookies.userEmail, name: cookies.name || cookies.userEmail };
+      }
+
+      async function getServerIdentity() {
+        const res = await fetch("/auth/session");
+        if (!res.ok) return null;
+        const data = await res.json().catch(() => ({}));
+        return data.identity || null;
+      }
+
+      async function saveManualServerIdentity(email, name) {
+        const res = await fetch("/auth/manual", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: `name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}`,
+        });
+        if (!res.ok) return null;
+        const data = await res.json().catch(() => ({}));
+        return data.identity || null;
+      }
+
+      async function saveGoogleServerIdentity(credential) {
+        const res = await fetch("/auth/google", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ credential }),
+        });
+        if (!res.ok) return null;
+        const data = await res.json().catch(() => ({}));
+        return data.identity || null;
+      }
+
+      function decodeCredentialPayload(credential) {
+        return JSON.parse(atob(credential.split(".")[1]));
+      }
+
+      async function handleSignedInState(email, name, options = {}) {
         userEmail = email;
-        fullName = name;
+        fullName = name || email;
 
-        document.cookie = `userEmail=${encodeURIComponent(email)}; max-age=${60 * 60 * 24 * 366}`;
-        document.cookie = `name=${encodeURIComponent(name)}; max-age=${60 * 60 * 24 * 366}`;
-
-        hasPassCheck(email, name);
+        persistSignedInState(userEmail, fullName);
+        if (!options.skipServerPersist) {
+          try {
+            await saveManualServerIdentity(userEmail, fullName);
+          } catch (err) {
+            console.warn("Could not persist sign-in identity to the server session.", err);
+          }
+        }
+        hasPassCheck(userEmail, fullName);
       }
 
       function hasPassCheck(email, name) {
@@ -149,8 +257,17 @@
           });
       }
 
-      function onSignIn(response) {
-        const payload = JSON.parse(atob(response.credential.split(".")[1]));
+      async function onSignIn(response) {
+        try {
+          const identity = await saveGoogleServerIdentity(response.credential);
+          if (identity) {
+            return handleSignedInState(identity.email, identity.name, { skipServerPersist: true });
+          }
+        } catch (err) {
+          console.warn("Could not persist Google sign-in to the server session.", err);
+        }
+
+        const payload = decodeCredentialPayload(response.credential);
         handleSignedInState(payload.email, payload.name);
       }
 
@@ -164,7 +281,7 @@
         document.getElementById("signinWrapper").classList.replace("hidden", "visible");
       });
 
-      document.getElementById("manualSignInForm").addEventListener("submit", (e) => {
+      document.getElementById("manualSignInForm").addEventListener("submit", async (e) => {
         e.preventDefault();
         const first = document.getElementById("firstName").value.trim();
         const last = document.getElementById("lastName").value.trim();
@@ -172,29 +289,38 @@
         if (!first || !last || !email) return;
         document.getElementById("manualSignInWrapper").classList.replace("visible", "hidden");
         const name = `${first} ${last}`;
+
+        try {
+          const identity = await saveManualServerIdentity(email, name);
+          if (identity) {
+            return handleSignedInState(identity.email, identity.name, { skipServerPersist: true });
+          }
+        } catch (err) {
+          console.warn("Could not persist manual sign-in to the server session.", err);
+        }
+
         handleSignedInState(email, name);
       });
 
-      window.addEventListener("DOMContentLoaded", () => {
+      window.addEventListener("DOMContentLoaded", async () => {
         const signinWrapper = document.getElementById("signinWrapper");
         signinWrapper.classList.replace("hidden", "visible");
         if (!isApple) {
           document.getElementById("altSignInToggle").style.display = "none";
         }
-        const cookies = document.cookie.split("; ").reduce((acc, c) => {
-          const [k, v] = c.split("=");
-          acc[k] = decodeURIComponent(v);
-          return acc;
-        }, {});
 
-        const email = cookies.userEmail;
-        const name = cookies.name;
-        if (!email) return;
+        let identity = null;
+        try {
+          identity = await getServerIdentity();
+        } catch (err) {
+          console.warn("Could not read the server sign-in session.", err);
+        }
 
-        userEmail = email;
-        fullName = name;
+        identity = identity || getStoredIdentity();
+        if (!identity) return;
 
-        hasPassCheck(email, name);
+        // Refresh browser storage and the server cookie so returning users keep the full remembered window.
+        handleSignedInState(identity.email, identity.name);
       });
 
       createPassSubmit.addEventListener("click", async () => {
@@ -229,7 +355,7 @@
             container.innerHTML = "";
             container.appendChild(a);
             container.classList.add("show");
-            if (window.AUTO_CLICK_CREATION_LINKS) a.click();
+            if (window.AUTO_CLICK_CREATION_LINKS) autoOpenWalletLink(a);
           };
 
           img.onerror = () => {
@@ -237,7 +363,7 @@
             container.innerHTML = "";
             container.appendChild(a);
             container.classList.add("show");
-            if (window.AUTO_CLICK_CREATION_LINKS) a.click();
+            if (window.AUTO_CLICK_CREATION_LINKS) autoOpenWalletLink(a);
           };
         } else {
           const data = await res.json().catch(() => ({}));
@@ -292,7 +418,7 @@
                 container.innerHTML = "";
                 container.appendChild(a);
                 container.classList.add("show");
-                if (window.AUTO_CLICK_RECORDING_LINKS) a.click();
+                if (window.AUTO_CLICK_RECORDING_LINKS) autoOpenWalletLink(a);
               };
 
               img.onerror = () => {
@@ -301,7 +427,7 @@
                 container.innerHTML = "";
                 container.appendChild(a);
                 container.classList.add("show");
-                if (window.AUTO_CLICK_RECORDING_LINKS) a.click();
+                if (window.AUTO_CLICK_RECORDING_LINKS) autoOpenWalletLink(a);
               };
             }
           }
